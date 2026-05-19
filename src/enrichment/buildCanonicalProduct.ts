@@ -1,8 +1,7 @@
 /**
  * Transforms a raw DiscoveredProduct into a CanonicalProduct.
  *
- * This is the single entry point for the enrichment pipeline.
- * It composes parseBrand → parseSize → normalizeName → generateProductKey.
+ * Pipeline: parseBrand → parseSize → normalizeName → generateProductKey → computeConfidence
  *
  * Contract:
  * - rawName is ALWAYS preserved verbatim
@@ -16,6 +15,7 @@ import { parseBrand } from "./parseBrand";
 import { parseSize } from "./parseSize";
 import { normalizeName } from "./normalizeName";
 import { generateProductKey } from "./generateProductKey";
+import { computeConfidence } from "./confidence";
 
 export function buildCanonicalProduct(raw: DiscoveredProduct): CanonicalProduct {
   const rawName = raw.name;
@@ -40,23 +40,24 @@ export function buildCanonicalProduct(raw: DiscoveredProduct): CanonicalProduct 
     category: raw.category,
   });
 
-  // ── Stage 5: Build supermarket mapping ──────────────────────────────────────
+  // ── Stage 5: Compute parser confidence ──────────────────────────────────────
+  const confidence = computeConfidence({
+    brand,
+    size,
+    sizeRaw: sizeResult?.raw,
+    productName,
+    rawName,
+  });
+
+  // ── Stage 6: Build supermarket mapping ──────────────────────────────────────
   const supermarkets: CanonicalProduct["supermarkets"] = {};
 
-  if (raw.source === "quickmart" && raw.productId) {
+  if (raw.source === "quickmart") {
     supermarkets.quickmart = {
-      externalId: raw.productId,
-      url: raw.url,
-    };
-  } else if (raw.source === "quickmart") {
-    // No externalId — still record the URL mapping
-    supermarkets.quickmart = {
-      externalId: "",
+      externalId: raw.productId ?? "",
       url: raw.url,
     };
   }
-
-  const now = new Date().toISOString();
 
   return {
     productKey,
@@ -67,7 +68,8 @@ export function buildCanonicalProduct(raw: DiscoveredProduct): CanonicalProduct 
     rawName,
     displayName,
     supermarkets,
-    firstSeenAt: now,
+    confidence,
+    firstSeenAt: new Date().toISOString(),
   };
 }
 
