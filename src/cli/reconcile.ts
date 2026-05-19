@@ -66,7 +66,7 @@ async function main() {
   logger.info(`Loaded ${canonicalProducts.length} canonical products from: ${inputFile}`);
   logger.info(`Target supermarkets: ${SUPERMARKETS.join(", ")}`);
 
-  const browserSession = await launchBrowser({ headless: !headful });
+  const browserSession = await launchBrowser({ headless: !headful, blockImages: false });
   const updatedProducts: CanonicalProduct[] = [];
   const stats = { matched: 0, unmatched: 0, errors: 0 };
 

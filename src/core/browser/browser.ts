@@ -13,6 +13,7 @@ export interface BrowserConfig {
   viewport?: { width: number; height: number };
   locale?: string;
   timezoneId?: string;
+  blockImages?: boolean
 }
 
 const DEFAULT_CONFIG: Required<Omit<BrowserConfig, "storageStatePath">> = {
@@ -23,6 +24,7 @@ const DEFAULT_CONFIG: Required<Omit<BrowserConfig, "storageStatePath">> = {
   viewport: { width: 1280, height: 900 },
   locale: "en-KE",
   timezoneId: "Africa/Nairobi",
+  blockImages: true,
 };
 
 export interface BrowserSession {
@@ -65,14 +67,16 @@ export async function launchBrowser(config: BrowserConfig = {}): Promise<Browser
   const context = await browser.newContext(contextOpts);
 
   // Intercept and block unnecessary resources to speed up scraping
-  await context.route("**/*", (route) => {
-    const resourceType = route.request().resourceType();
-    if (["image", "media", "font"].includes(resourceType)) {
-      route.abort();
-    } else {
-      route.continue();
-    }
-  });
+  if (config.blockImages ?? true) {
+    await context.route("**/*", (route) => {
+      const resourceType = route.request().resourceType();
+      if (["image", "media", "font"].includes(resourceType)) {
+        route.abort();
+      } else {
+        route.continue();
+      }
+    });
+  }
 
   return {
     browser,
