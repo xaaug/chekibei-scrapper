@@ -1,10 +1,10 @@
 import { BaseScraper } from "./base/BaseScraper";
 import { SupermarketId } from "./base/types";
-// import { CarrefourScraper } from "./carrefour/carrefourScraper";
+import { CarrefourScraper } from "./carrefour/carrefourScraper";
 import { NaivasScraper } from "./naivas/naivasScraper";
 
 const REGISTRY: Partial<Record<SupermarketId, () => BaseScraper>>  = {
-//   carrefour: () => new CarrefourScraper(),
+  carrefour: () => new CarrefourScraper(),
   naivas: () => new NaivasScraper(),
 };
 

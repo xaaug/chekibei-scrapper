@@ -84,8 +84,8 @@ async function main() {
         try {
           const result = await scraper.scrape(page, {
             searchQuery: canonical.displayName,
-            maxScrolls: 3,          // shallow search — we just need top results
-            waitTime: 2_500,
+            maxScrolls: 5,          // shallow search — we just need top results
+            waitTime: 5_500,
           });
 
           candidatesBySuper[supermarket] = result.candidates;
@@ -119,7 +119,7 @@ async function main() {
       updatedProducts.push(updated);
 
       logger.info(
-        `  ${hadMatches ? "✓" : "✗"} ${result.matches.map((m) => `${m.supermarket}(${m.score.toFixed(2)})`).join(", ") || "no matches"}`,
+        `${hadMatches ? "✓" : "✗"} ${result.matches.map((m) => `${m.supermarket}(${m.score.combined.toFixed(2)})`).join(", ") || "no matches"}`
       );
     }
   } finally {

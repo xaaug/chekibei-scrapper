@@ -1,29 +1,37 @@
 import { CandidateProduct, SupermarketId } from "../supermarkets/base/types";
 import { CanonicalProduct, SupermarketMapping } from "../types/canonical";
-import { similarityScore } from "./similarity";
+import { scoreCandidate, ScoreBreakdown } from "./similarity";
 import { scopedLogger } from "../core/logger/logger";
 
 const log = scopedLogger("reconciliationEngine");
 
-/** Minimum score to consider a candidate a match */
-const MATCH_THRESHOLD = 0.5;
+/**
+ * Minimum combined score to accept a match.
+ *
+ * With BRAND_WEIGHT=0.6 + NAME_WEIGHT=0.4:
+ *   - Perfect brand + weak name  → 0.6*1.0 + 0.4*0.3 = 0.72  ✓ accepted
+ *   - Weak brand  + perfect name → 0.6*0.3 + 0.4*1.0 = 0.58  ✓ accepted (brand present but partial)
+ *   - No brand    + perfect name → 0.6*0.0 + 0.4*1.0 = 0.40  ✗ rejected (different brand entirely)
+ *   - Perfect brand + no name    → 0.6*1.0 + 0.4*0.0 = 0.60  ✓ accepted (same brand, likely match)
+ */
+const MATCH_THRESHOLD = 0.55;
 
 export interface ReconciliationMatch {
   supermarket: SupermarketId;
   candidate: CandidateProduct;
-  score: number;
+  score: ScoreBreakdown;
 }
 
 export interface ReconciliationResult {
   productKey: string;
   matches: ReconciliationMatch[];
-  /** Updated supermarkets map — merged with existing */
   updatedSupermarkets: CanonicalProduct["supermarkets"];
 }
 
 /**
  * For a single canonical product, score all candidates from each supermarket
- * and pick the best match per supermarket above the threshold.
+ * using two-phase brand → product name scoring, then pick the best match
+ * per supermarket above the threshold.
  */
 export function reconcileProduct(
   canonical: CanonicalProduct,
@@ -36,17 +44,24 @@ export function reconcileProduct(
     const sid = supermarket as SupermarketId;
     if (!candidates || candidates.length === 0) continue;
 
-    // Score every candidate against the canonical displayName
+    // Score every candidate with the two-phase scorer
     const scored = candidates
-      .map((c) => ({
-        candidate: c,
-        score: similarityScore(canonical.displayName, c.name),
+      .map((candidate) => ({
+        candidate,
+        score: scoreCandidate(
+          canonical.brand || "",
+          canonical.productName,
+          candidate.name,
+        ),
       }))
-      .filter((s) => s.score >= MATCH_THRESHOLD)
-      .sort((a, b) => b.score - a.score);
+      .filter((s) => s.score.combined >= MATCH_THRESHOLD)
+      .sort((a, b) => b.score.combined - a.score.combined);
 
     if (scored.length === 0) {
-      log.debug(`No match for "${canonical.displayName}" on ${sid}`);
+      log.debug(
+        `No match for "${canonical.displayName}" on ${sid}` +
+          ` — top candidate: "${candidates[0]?.name ?? "none"}"`,
+      );
       continue;
     }
 
@@ -54,12 +69,13 @@ export function reconcileProduct(
 
     log.debug(
       `Match: "${canonical.displayName}" → "${best.candidate.name}" ` +
-        `(${sid}, score: ${best.score.toFixed(2)})`,
+        `(${sid}, combined: ${best.score.combined.toFixed(2)}, ` +
+        `brand: ${best.score.brand.toFixed(2)}, ` +
+        `name: ${best.score.name.toFixed(2)})`,
     );
 
     matches.push({ supermarket: sid, candidate: best.candidate, score: best.score });
 
-    // Merge into supermarkets map — never overwrite an existing confirmed mapping
     const mapping: SupermarketMapping = {
       externalId: best.candidate.productId ?? "",
       url: best.candidate.url,
