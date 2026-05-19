@@ -3,12 +3,14 @@
  * Discovery mode collects product identity data — not prices.
  */
 
+
+export type DiscoverySource = "quickmart";
 export interface DiscoveredProduct {
   productId?: string;
   name: string;
   url: string;
   category: string;
-  source: "quickmart";
+  source: DiscoverySource;
 }
 
 export interface DiscoveryCategoryInput {

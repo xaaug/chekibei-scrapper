@@ -5,8 +5,6 @@
  *   npm run discovery
  *   npm run discovery -- --headful        (visible browser)
  *   npm run discovery -- --url <url> --pages <n>
- *
- * Defaults to a predefined set of Quickmart categories if no --url given.
  */
 
 import path from "path";
@@ -15,8 +13,9 @@ import { launchBrowser } from "../core/browser/browser";
 import { loadSession } from "../supermarkets/quickmart/session/loadSession";
 import { initSession } from "../supermarkets/quickmart/session/initSession";
 import { runDiscoveryPipeline } from "../supermarkets/quickmart/discovery/discoveryPipeline";
-import { QUICKMART_CONFIG } from "../supermarkets/quickmart/config";
 import { DiscoveryCategoryInput, DiscoveryRunResult } from "../types/discovery";
+import { CanonicalProduct } from "../types/canonical";
+import { buildCanonicalProducts } from "../enrichment";
 import { logger } from "../core/logger/logger";
 
 // ── CLI arg parsing ────────────────────────────────────────────────────────────
@@ -31,32 +30,32 @@ function getArg(flag: string): string | undefined {
 const customUrl = getArg("--url");
 const customPages = getArg("--pages");
 
-// ── Default categories ──────────────────────────────────────────────────────────
+// ── Default categories ─────────────────────────────────────────────────────────
 const DEFAULT_CATEGORIES: DiscoveryCategoryInput[] = [
   { categoryUrl: "https://quickmart.co.ke/flour", maxPages: 5 },
-  { categoryUrl: "https://quickmart.co.ke/sugar", maxPages: 5 },
-  { categoryUrl: "https://quickmart.co.ke/rice-cereals", maxPages: 20 },
-  { categoryUrl: "https://quickmart.co.ke/cooking-oil-fats", maxPages: 10 },
-  { categoryUrl: "https://quickmart.co.ke/dairy-products", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/cakes-bread", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/breakfast", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/beverages", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/juices-carbonates", maxPages: 80 },
-  { categoryUrl: "https://quickmart.co.ke/water", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/seasoning-condiments", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/pasta-noodles", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/diapers-wipes", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/oral-care-products", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/sanitary", maxPages: 50 },
-  { categoryUrl: "https://quickmart.co.ke/personal-wash", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/sugar", maxPages: 5 },
+  // { categoryUrl: "https://quickmart.co.ke/rice-cereals", maxPages: 20 },
+  // { categoryUrl: "https://quickmart.co.ke/cooking-oil-fats", maxPages: 10 },
+  // { categoryUrl: "https://quickmart.co.ke/dairy-products", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/cakes-bread", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/breakfast", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/beverages", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/juices-carbonates", maxPages: 80 },
+  // { categoryUrl: "https://quickmart.co.ke/water", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/seasoning-condiments", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/pasta-noodles", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/diapers-wipes", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/oral-care-products", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/sanitary", maxPages: 50 },
+  // { categoryUrl: "https://quickmart.co.ke/personal-wash", maxPages: 50 },
 ];
 
+// ── Main ───────────────────────────────────────────────────────────────────────
 async function main() {
   logger.info("═══════════════════════════════════════════════");
   logger.info("  Chekibei — Quickmart Discovery Scraper");
   logger.info("═══════════════════════════════════════════════");
 
-  // ── Determine categories to scrape ──────────────────────────────────────────
   const categories: DiscoveryCategoryInput[] = customUrl
     ? [{ categoryUrl: customUrl, maxPages: customPages ? parseInt(customPages, 10) : 5 }]
     : DEFAULT_CATEGORIES;
@@ -65,37 +64,40 @@ async function main() {
     urls: categories.map((c) => c.categoryUrl),
   });
 
-  // ── Check session ────────────────────────────────────────────────────────────
   const session = loadSession();
 
-  // ── Launch browser ───────────────────────────────────────────────────────────
   const browserSession = await launchBrowser({
     headless: !headful,
     storageStatePath: session.exists ? session.path : undefined,
   });
 
   let results: DiscoveryRunResult[] = [];
+  let canonical: CanonicalProduct[] = [];
 
   try {
-    // ── Init session (location setup if needed) ──────────────────────────────
     const { page: sessionPage, sessionWasNew } = await initSession(browserSession.context);
     await sessionPage.close();
 
     logger.info(sessionWasNew ? "New session established" : "Session reused");
 
-    // ── Run discovery pipeline ───────────────────────────────────────────────
     results = await runDiscoveryPipeline(browserSession.context, categories);
+
+    // ── Enrichment stage ─────────────────────────────────────────────────────
+    const allRaw = results.flatMap((r) => r.products);
+    canonical = buildCanonicalProducts(allRaw);
+
+    logger.info(
+      `Enrichment complete: ${canonical.length} canonical products from ${allRaw.length} raw`,
+    );
   } finally {
     await browserSession.close();
   }
 
-  // ── Print summary ────────────────────────────────────────────────────────────
   printSummary(results);
-
-  // ── Save results ─────────────────────────────────────────────────────────────
-  await saveResults(results);
+  await saveResults(results, canonical);
 }
 
+// ── Summary ────────────────────────────────────────────────────────────────────
 function printSummary(results: DiscoveryRunResult[]) {
   const totalProducts = results.reduce((s, r) => s + r.totalProducts, 0);
   const totalErrors = results.reduce((s, r) => s + r.errors.length, 0);
@@ -119,24 +121,28 @@ function printSummary(results: DiscoveryRunResult[]) {
   );
 }
 
-async function saveResults(results: DiscoveryRunResult[]) {
+// ── Save ───────────────────────────────────────────────────────────────────────
+async function saveResults(
+  results: DiscoveryRunResult[],
+  canonical: CanonicalProduct[],
+) {
   const outputDir = path.resolve(process.cwd(), "output");
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const outputPath = path.join(outputDir, `discovery-${timestamp}.json`);
 
-  fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
-  logger.info(`Results saved: ${outputPath}`);
+  // Raw discovery — full run results per category
+  const discoveryPath = path.join(outputDir, `discovery-${timestamp}.json`);
+  fs.writeFileSync(discoveryPath, JSON.stringify(results, null, 2));
+  logger.info(`Raw discovery saved: ${discoveryPath}`);
 
-  // Also write a flat product list for convenience
-  const allProducts = results.flatMap((r) => r.products);
-  const flatPath = path.join(outputDir, `products-${timestamp}.json`);
-  fs.writeFileSync(flatPath, JSON.stringify(allProducts, null, 2));
-  logger.info(`Flat product list saved: ${flatPath} (${allProducts.length} items)`);
+  // Canonical products — enriched, deduplicated
+  const canonicalPath = path.join(outputDir, `canonical-${timestamp}.json`);
+  fs.writeFileSync(canonicalPath, JSON.stringify(canonical, null, 2));
+  logger.info(`Canonical products saved: ${canonicalPath} (${canonical.length} items)`);
 }
 
-// ── Run ───────────────────────────────────────────────────────────────────────
+// ── Run ────────────────────────────────────────────────────────────────────────
 main().catch((err) => {
   logger.error("Fatal error in discovery CLI", {
     error: err instanceof Error ? err.message : String(err),
