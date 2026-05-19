@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "discovery": "ts-node src/cli/discovery.ts",
+    "reconcile": "ts-node src/cli/reconcile.ts",
     "dev:discovery": "ts-node --watch src/cli/discovery.ts"
   },
   "dependencies": {

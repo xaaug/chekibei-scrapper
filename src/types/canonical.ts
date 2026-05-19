@@ -5,7 +5,7 @@
  * pipeline. The two models are intentionally separate.
  */
 
-export type SupermarketSource = "quickmart";
+export type SupermarketSource = "quickmart" | "carrefour" | "naivas";
 
 export type ConfidenceLevel = "high" | "medium" | "low";
 
