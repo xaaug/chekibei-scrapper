@@ -1,0 +1,7 @@
+node_modules/
+dist/
+logs/
+output/
+storage/sessions/
+*.json.bak
+.env

@@ -1,0 +1,20 @@
+{
+  "name": "chekibei-scraper",
+  "version": "1.0.0",
+  "description": "Retail intelligence scraper for Kenyan supermarkets",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "discovery": "ts-node src/cli/discovery.ts",
+    "dev:discovery": "ts-node --watch src/cli/discovery.ts"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0",
+    "winston": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}
