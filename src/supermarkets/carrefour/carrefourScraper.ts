@@ -17,24 +17,30 @@ export class CarrefourScraper extends BaseScraper {
   }
 
   protected async navigateToSearch(page: Page, query: string): Promise<void> {
-    await page.goto(CARREFOUR_CONFIG.baseUrl, {
-        waitUntil: "networkidle",
-        timeout: 30_000,
-      });
+    // Build the search URL directly — no homepage load, no search box interaction.
+    // This avoids the networkidle timeout since we skip the heavy landing page.
+    const searchUrl = `${CARREFOUR_CONFIG.searchUrl}${encodeURIComponent(query)}`;
 
-    await page.waitForSelector(CARREFOUR_SELECTORS.searchInput, {
-      state: "visible",
+    log.debug(`Navigating to: ${searchUrl}`);
+
+    await page.goto(searchUrl, {
+      waitUntil: "domcontentloaded", // networkidle never settles on Carrefour
       timeout: 30_000,
     });
 
-    await page.focus(CARREFOUR_SELECTORS.searchInput);
-    await page.fill(CARREFOUR_SELECTORS.searchInput, query);
-await page.keyboard.press("Enter");
-
-    await page.waitForURL(/.*search.*/, { timeout: 10_000 }).catch(() => {
-      log.warn("URL did not change to search results — proceeding anyway");
+    // Wait for at least one product card to confirm results loaded
+    await page.waitForSelector(CARREFOUR_SELECTORS.productCard, {
+      state: "visible",
+      timeout: 15_000,
+    }).catch(() => {
+      log.warn(`No product cards visible for "${query}" — page may be empty or slow`);
     });
 
+    // add temporarily in navigateToSearch, after the waitForSelector catch
+const bodyText = await page.evaluate(() => document.body.innerText.trim().slice(0, 500));
+const title = await page.title();
+log.debug(`Page title: "${title}"`);
+log.debug(`Body preview: "${bodyText}"`);
     log.debug(`Navigated to search results for: "${query}"`);
   }
 

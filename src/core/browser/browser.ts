@@ -19,8 +19,7 @@ export interface BrowserConfig {
 const DEFAULT_CONFIG: Required<Omit<BrowserConfig, "storageStatePath">> = {
   headless: true,
   slowMo: 0,
-  userAgent:
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
   viewport: { width: 1280, height: 900 },
   locale: "en-KE",
   timezoneId: "Africa/Nairobi",
@@ -46,7 +45,12 @@ export async function launchBrowser(config: BrowserConfig = {}): Promise<Browser
 
   log.info("Launching browser", { headless });
 
-  const browser = await chromium.launch({ headless, slowMo });
+  const browser = await chromium.launch({ headless, slowMo,  args: [
+    "--disable-blink-features=AutomationControlled", // ← key one
+    "--disable-infobars",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+  ], });
 
   const contextOpts: Parameters<Browser["newContext"]>[0] = {
     userAgent,
