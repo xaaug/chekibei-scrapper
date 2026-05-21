@@ -7,7 +7,8 @@
     "build": "tsc",
     "discovery": "ts-node src/cli/discovery.ts",
     "reconcile": "ts-node src/cli/reconcile.ts",
-    "dev:discovery": "ts-node --watch src/cli/discovery.ts"
+    "dev:discovery": "ts-node --watch src/cli/discovery.ts",
+    "track-prices": "ts-node src/cli/trackPrices.ts"
   },
   "dependencies": {
     "playwright": "^1.44.0",
