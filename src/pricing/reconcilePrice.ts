@@ -18,7 +18,7 @@ export function reconcilePrice(
     supermarket: scraped.supermarket,
 
     // basePrice: locked on first insert, never overwritten
-    basePrice: existing?.basePrice ?? scraped.currentPrice ?? 0,
+    basePrice: existing?.basePrice ?? scraped.originalPrice ?? scraped.currentPrice ?? 0,
     currentPrice: scraped.currentPrice,
 
     currency: "KES",
