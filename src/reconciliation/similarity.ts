@@ -60,6 +60,8 @@ const SYNONYM_GROUPS: readonly string[][] = [
   ["milk", "maziwa"],
   ["bread", "mkate"],
   ["wheat", "ngano", "homebaking", "home baking", "chapati flour", "all purpose flour"],
+  ["e/virgin", "extra virgin"],
+  ["olive oil", "oliveoil"],
   ["chicken", "kuku"],
   ["beef", "nyama"],
   ["fish", "samaki"],
