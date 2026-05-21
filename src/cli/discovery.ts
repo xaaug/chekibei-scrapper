@@ -32,10 +32,12 @@ const customPages = getArg("--pages");
 
 // ── Default categories ─────────────────────────────────────────────────────────
 const DEFAULT_CATEGORIES: DiscoveryCategoryInput[] = [
+  
+  { categoryUrl: "https://quickmart.co.ke/foods", maxPages: 1 },
   // { categoryUrl: "https://quickmart.co.ke/flour", maxPages: 1 },
   // { categoryUrl: "https://quickmart.co.ke/sugar", maxPages: 1 },
   // { categoryUrl: "https://quickmart.co.ke/rice-cereals", maxPages: 20 },
-  { categoryUrl: "https://quickmart.co.ke/cooking-oils-fats", maxPages: 1},
+  // { categoryUrl: "https://quickmart.co.ke/cooking-oils-fats", maxPages: 1},
   // { categoryUrl: "https://quickmart.co.ke/dairy-products", maxPages: 50 },
   // { categoryUrl: "https://quickmart.co.ke/cakes-bread", maxPages: 50 },
   // { categoryUrl: "https://quickmart.co.ke/breakfast", maxPages: 50 },

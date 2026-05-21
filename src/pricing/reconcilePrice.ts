@@ -7,20 +7,21 @@ export function reconcilePrice(
   scraped: ScrapedSupermarketData,
   existing: PriceSnapshot | null,
 ): PriceSnapshot {
+  // basePrice: locked on first insert, never overwritten
+  const basePrice = existing?.basePrice ?? scraped.originalPrice ?? scraped.currentPrice ?? 0;
+
   const discount = buildDiscount(
     scraped.currentPrice,
     scraped.originalPrice ?? null,
-    (scraped as any).isOnOffer ?? false,
+    (scraped as any).isOnPromo ?? false,
+    basePrice,
   );
 
   return {
     productKey: canonical.productKey,
     supermarket: scraped.supermarket,
-
-    // basePrice: locked on first insert, never overwritten
-    basePrice: existing?.basePrice ?? scraped.originalPrice ?? scraped.currentPrice ?? 0,
+    basePrice,
     currentPrice: scraped.currentPrice,
-
     currency: "KES",
     discount,
     imageUrl: scraped.imageUrl,
@@ -31,21 +32,28 @@ export function reconcilePrice(
 function buildDiscount(
   currentPrice: number | null,
   originalPrice: number | null,
-  isOnOffer: boolean,
+  isOnPromo: boolean,
+  basePrice: number,
 ): Discount {
-  if (!isOnOffer || !originalPrice || !currentPrice || originalPrice <= currentPrice) {
+  if (!currentPrice) return { active: false, amount: 0, type: "unknown" };
+
+  // Determine the reference price to diff against — prefer explicit originalPrice
+  // from the scraper, fall back to the locked basePrice
+  const referencePrice = originalPrice ?? (basePrice > currentPrice ? basePrice : null);
+
+  if (!referencePrice || referencePrice <= currentPrice) {
     return { active: false, amount: 0, type: "unknown" };
   }
 
   return {
     active: true,
-    amount: Math.round(originalPrice - currentPrice),
-    type: inferDiscountType(currentPrice, originalPrice),
+    amount: Math.round(referencePrice - currentPrice),
+    type: inferDiscountType(currentPrice, referencePrice),
   };
 }
 
-function inferDiscountType(current: number, original: number): DiscountType {
-  const pct = ((original - current) / original) * 100;
+function inferDiscountType(current: number, reference: number): DiscountType {
+  const pct = ((reference - current) / reference) * 100;
   if (pct >= 30) return "clearance";
   if (pct >= 5)  return "promotion";
   return "unknown";

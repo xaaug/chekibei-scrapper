@@ -13,6 +13,8 @@
 const BRAND_SYNONYMS: string[][] = [
   ["Blue Band", "Blueband", "Blue-Band"],
   ["Santa Maria", "Santamaria", "Santa-Maria"],
+  ["Santa Lucia", "Santalucia", "Santa-Lucia"],
+  ["Parle G", "Parle-G", "ParleG"],
   ["Tap & Go", "Tap and Go", "Tap&Go"],
   ["Naivas Local", "Naivas"],
   ["Quick Choice", "Quick Choice", "QuickChoice"],
