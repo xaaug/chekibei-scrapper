@@ -163,6 +163,8 @@ async function main() {
               `  ✓ ${supermarket}: KES ${live.currentPrice}` +
                 (live.imageUrl ? " + image" : " [no image]"),
             );
+
+            logger.info(`    (Original Price: ${live.originalPrice ? "yes" : "no"}, CurrentPrice: ${live.currentPrice ? "yes" : "no"})`);
           }
 
           // ── Normalize ────────────────────────────────────────────────────
