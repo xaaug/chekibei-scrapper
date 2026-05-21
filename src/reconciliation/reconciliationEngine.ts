@@ -81,8 +81,45 @@ export function reconcileProduct(
       url: best.candidate.url,
     };
 
+// Validate it's actually a product detail URL, not a search/category URL
+const isValidProductUrl = isProductDetailUrl(sid, best.candidate.url);
+
+if (!isValidProductUrl) {
+  log.warn(
+    `Skipping ${sid} match for "${canonical.displayName}" — URL doesn't look like a product page: ${best.candidate.url}`,
+  );
+  continue;
+}
+
+updatedSupermarkets[sid] = mapping;
+
     updatedSupermarkets[sid] = mapping;
   }
 
   return { productKey: canonical.productKey, matches, updatedSupermarkets };
+}
+
+function isProductDetailUrl(supermarket: SupermarketId, url: string): boolean {
+  switch (supermarket) {
+    case "carrefour":
+      // Carrefour product URLs always contain /p/ followed by digits
+      return /\/p\/\d+/.test(url);
+    case "naivas":
+      // Naivas product URLs are slugs — no /search or /category in path
+      return (
+        url.includes("naivas.online/") &&
+        !url.includes("/search") &&
+        !url.includes("/category") &&
+        !url.includes("?")
+      );
+    case "quickmart":
+      // Quickmart product URLs are slugs directly off root
+      return (
+        url.includes("quickmart.co.ke/") &&
+        !url.includes("/search") &&
+        !url.includes("?")
+      );
+    default:
+      return true;
+  }
 }
