@@ -55,11 +55,11 @@ function normaliseUnit(token: string): string {
  * Add entries here as you encounter new mismatches in Kenyan supermarket data.
  */
 const SYNONYM_GROUPS: readonly string[][] = [
-  ["flour", "meal", "unga"],
+  ["maize flour", "maize meal", "unga"],
   ["yoghurt", "yogurt", "yoghourt"],
   ["milk", "maziwa"],
   ["bread", "mkate"],
-  ["wheat", "ngano"],
+  ["wheat", "ngano", "homebaking", "home baking", "chapati flour", "all purpose flour"],
   ["chicken", "kuku"],
   ["beef", "nyama"],
   ["fish", "samaki"],
