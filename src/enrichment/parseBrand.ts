@@ -3,18 +3,36 @@
  * list first, then falling back to the first token.
  *
  * "Blue Band Porridge 250G" → "Blue Band"  (known multi-word match)
- * "Jogoo Maize Flour 2KG"   → "Jogoo"      (known single-word match)
+ * "Santamaria Juice 1L"     → "Santa Maria" (synonym resolved to canonical)
  * "Unknown Thing 500ml"     → "Unknown"    (first-token fallback)
+ *
+ * Synonym groups: first item is canonical, rest are aliases.
+ * All aliases resolve to the canonical form.
  */
 
-const KNOWN_BRANDS: string[] = [
-  // Multi-word — must be here, fallback only gets first token
-  "Blue Band",
-  "Quick Choice"
+const BRAND_SYNONYMS: string[][] = [
+  ["Blue Band", "Blueband", "Blue-Band"],
+  ["Santa Maria", "Santamaria", "Santa-Maria"],
+  ["Tap & Go", "Tap and Go", "Tap&Go"],
+  ["Naivas Local", "Naivas"],
+  ["Quick Choice", "Quick Choice", "QuickChoice"],
+  // Misspeled
+  ["Brookside", "Brook Side"],
 ];
 
-// Longest first so "Blue Band" matches before "Blue"
-const SORTED_BRANDS = [...KNOWN_BRANDS].sort((a, b) => b.length - a.length);
+// Flatten into a lookup: alias (lowercased) → canonical
+const BRAND_ALIAS_MAP = new Map<string, string>();
+for (const group of BRAND_SYNONYMS) {
+  const canonical = group[0];
+  for (const alias of group) {
+    BRAND_ALIAS_MAP.set(alias.toLowerCase(), canonical);
+  }
+}
+
+// All known strings (canonical + aliases), sorted longest first
+const SORTED_BRAND_STRINGS = [...BRAND_ALIAS_MAP.keys()].sort(
+  (a, b) => b.length - a.length,
+);
 
 export function parseBrand(rawName: string): string | undefined {
   const trimmed = rawName.trim();
@@ -22,13 +40,13 @@ export function parseBrand(rawName: string): string | undefined {
 
   const lower = trimmed.toLowerCase();
 
-  for (const brand of SORTED_BRANDS) {
-    if (lower.startsWith(brand.toLowerCase())) {
-      return trimmed.slice(0, brand.length); // preserve original casing
+  for (const alias of SORTED_BRAND_STRINGS) {
+    if (lower.startsWith(alias)) {
+      return BRAND_ALIAS_MAP.get(alias); // always returns canonical
     }
   }
 
-  // Fallback: first token
+  // Fallback: first token as-is
   const first = trimmed.split(/\s+/)[0];
   return first?.length > 0 ? first : undefined;
 }
