@@ -11,6 +11,7 @@
     "track-prices": "ts-node src/cli/trackPrices.ts"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "playwright": "^1.44.0",
     "winston": "^3.13.0"
   },
