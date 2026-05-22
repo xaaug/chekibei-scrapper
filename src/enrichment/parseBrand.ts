@@ -15,6 +15,7 @@ const BRAND_SYNONYMS: string[][] = [
   ["Santa Maria", "Santamaria", "Santa-Maria"],
   ["Santa Lucia", "Santalucia", "Santa-Lucia"],
   ["Parle G", "Parle-G", "ParleG"],
+  ["Baraka Chai", "Baraka-Chai", "BarakaChai"],
   ["Tap & Go", "Tap and Go", "Tap&Go"],
   ["Naivas Local", "Naivas"],
   ["Quick Choice", "Quick Choice", "QuickChoice"],
