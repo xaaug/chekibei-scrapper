@@ -8,6 +8,7 @@
  *   npm run reconcile -- --supermarkets carrefour,naivas
  */
 
+require('dotenv').config()
 import path from "path";
 import fs from "fs";
 import { launchBrowser } from "../core/browser/browser";
@@ -16,6 +17,9 @@ import { reconcileProduct } from "../reconciliation/reconciliationEngine";
 import { CanonicalProduct } from "../types/canonical";
 import { CandidateProduct, SupermarketId } from "../supermarkets/base/types";
 import { logger } from "../core/logger/logger";
+
+
+const CONVEX_HTTP_URL = process.env.CONVEX_HTTP_URL;
 
 // ── Args ───────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -146,6 +150,28 @@ function printSummary(
 }
 
 // ── Save ───────────────────────────────────────────────────────────────────────
+async function pushToConvex(endpoint: string, payload: CanonicalProduct[]): Promise<void> {
+  if (!CONVEX_HTTP_URL) {
+    logger.warn("CONVEX_HTTP_URL not set — skipping push");
+    return;
+  }
+
+  const url = `${CONVEX_HTTP_URL}${endpoint}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Convex push to ${endpoint} failed (${res.status}): ${text}`);
+  }
+
+  const result = await res.json();
+  logger.info(`Convex push result: ${JSON.stringify(result)}`);
+}
+
 async function saveOutput(products: CanonicalProduct[]) {
   const outputDir = path.resolve(process.cwd(), "output");
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
@@ -155,6 +181,12 @@ async function saveOutput(products: CanonicalProduct[]) {
 
   fs.writeFileSync(outPath, JSON.stringify(products, null, 2));
   logger.info(`Saved: ${outPath} (${products.length} products)`);
+
+  try {
+    await pushToConvex("/push/canonical", products);
+  } catch (e) {
+    logger.error(`Failed to push reconciled products to Convex: ${e}`);
+  }
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────

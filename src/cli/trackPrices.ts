@@ -1,29 +1,34 @@
 /**
  * CLI: npm run track-prices
  *
- * Reads latest canonical-reconciled JSON.
+ * Reads canonical-reconciled products from Convex (not local file).
  * Visits each product page per supermarket.
  * Extracts real price + image + offer/OOS state.
- * Upserts price snapshots, appends history on change.
+ * Upserts price snapshots to Convex, appends history on change.
  *
  * Usage:
  *   npm run track-prices
- *   npm run track-prices -- --input output/canonical-reconciled-xxx.json
  *   npm run track-prices -- --headful
  *   npm run track-prices -- --supermarkets quickmart,naivas
  */
+
+require("dotenv").config();
 
 import path from "path";
 import fs from "fs";
 import { CanonicalProduct } from "../types/canonical";
 import { SupermarketId } from "../supermarkets/base/types";
-import { PriceSnapshot, PriceHistoryEntry } from "../types/pricing";
 import { scrapeProductPage } from "../scrapers/productPageScraper";
 import { updatePriceSnapshot } from "../pricing/updatePriceSnapshot";
 import { normalizeScrapedProduct } from "../pricing/normalizeScrapedProduct";
-import { getSnapshot, upsertSnapshot, appendHistory, dumpStore } from "../db/mockConvex";
+import {
+  getAllCanonicalProducts,
+  getSnapshot,
+  upsertSnapshot,
+} from "../db/convexClient";
 import { launchBrowser } from "../core/browser/browser";
 import { logger } from "../core/logger/logger";
+import { PriceSnapshot, PriceHistoryEntry } from "../types/pricing";
 
 // ── Args ───────────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -34,44 +39,30 @@ function getArg(flag: string): string | undefined {
   return i !== -1 ? args[i + 1] : undefined;
 }
 
-const inputArg = getArg("--input");
 const supersArg = getArg("--supermarkets");
 
 const TARGET_SUPERMARKETS: SupermarketId[] = supersArg
   ? (supersArg.split(",").map((s) => s.trim()) as SupermarketId[])
   : ["quickmart", "carrefour", "naivas"];
 
-// ── Resolve input ──────────────────────────────────────────────────────────────
-function resolveInput(): string {
-  if (inputArg) return path.resolve(inputArg);
-
-  const outputDir = path.resolve(process.cwd(), "output");
-  const files = fs
-    .readdirSync(outputDir)
-    .filter((f) => f.startsWith("canonical-reconciled-") && f.endsWith(".json"))
-    .map((f) => ({ name: f, mtime: fs.statSync(path.join(outputDir, f)).mtimeMs }))
-    .sort((a, b) => b.mtime - a.mtime);
-
-  if (files.length === 0) {
-    throw new Error("No canonical-reconciled JSON found. Run `npm run reconcile` first.");
-  }
-
-  logger.info(`Auto-selected: ${files[0].name}`);
-  return path.join(outputDir, files[0].name);
-}
-
 // ── Main ───────────────────────────────────────────────────────────────────────
 async function main() {
   logger.info("═══════════════════════════════════════════════");
   logger.info("  Chekibei — Live Price Tracker");
   logger.info("═══════════════════════════════════════════════");
+  logger.info(`Convex URL: ${process.env.CONVEX_HTTP_URL ?? "not set"}`);
+  logger.info(`Target supermarkets: ${TARGET_SUPERMARKETS.join(", ")}`);
 
-  const inputFile = resolveInput();
-  const products: CanonicalProduct[] = JSON.parse(fs.readFileSync(inputFile, "utf-8"));
+  // ── Pull canonical products from Convex ────────────────────────────────────
+  let products: CanonicalProduct[];
+  try {
+    products = await getAllCanonicalProducts();
+    logger.info(`Loaded ${products.length} products from Convex`);
+  } catch (e) {
+    logger.error(`Failed to fetch canonical products from Convex: ${e}`);
+    process.exit(1);
+  }
 
-  logger.info(`Products: ${products.length} | Supermarkets: ${TARGET_SUPERMARKETS.join(", ")}`);
-
-  // blockImages: false — we need images to load for extraction
   const browser = await launchBrowser({ headless: !headful, blockImages: false });
 
   const stats = {
@@ -84,6 +75,10 @@ async function main() {
     priceChanges: 0,
     newSnapshots: 0,
   };
+
+  // Collect snapshots + history locally so we can write a backup JSON at the end
+  const localSnapshots: PriceSnapshot[] = [];
+  const localHistory: PriceHistoryEntry[] = [];
 
   try {
     for (const canonical of products) {
@@ -118,30 +113,7 @@ async function main() {
           if (live.isOutOfStock) {
             logger.info(`  ⊘ ${supermarket}: OUT OF STOCK`);
             stats.outOfStock++;
-
-            // Still upsert the snapshot so we track OOS state
-            // currentPrice = null when OOS
-            const scraped = normalizeScrapedProduct({
-              supermarket,
-              externalId: mapping.externalId,
-              url: mapping.url,
-              name: live.name || canonical.displayName,
-              currentPrice: null as any,  // OOS — no active price
-              originalPrice: null,
-              isOnOffer: false,
-              isOutOfStock: true,
-              imageUrl: live.imageUrl,    // still capture image even if OOS
-              scrapedAt: live.scrapedAt,
-            });
-
-            const existing = await getSnapshot(canonical.productKey, supermarket);
-            const { snapshot, historyEntry, wasNew } = updatePriceSnapshot(
-              canonical, scraped, existing,
-            );
-
-            await upsertSnapshot({ ...snapshot, currentPrice: null as any });
-            if (historyEntry) await appendHistory(historyEntry);
-            continue;
+            continue; // skip snapshot upsert until OOS fields are typed
           }
 
           // ── No price found ───────────────────────────────────────────────
@@ -152,7 +124,7 @@ async function main() {
           }
 
           // ── Log what we found ─────────────────────────────────────────────
-          if (live.isOnOffer && live.originalPrice) {
+          if ( live.originalPrice) {
             logger.info(
               `  ✓ ${supermarket}: KES ${live.currentPrice} (was KES ${live.originalPrice}) ON OFFER` +
                 (live.imageUrl ? " + image" : ""),
@@ -163,8 +135,6 @@ async function main() {
               `  ✓ ${supermarket}: KES ${live.currentPrice}` +
                 (live.imageUrl ? " + image" : " [no image]"),
             );
-
-            logger.info(`    (Original Price: ${live.originalPrice ? "yes" : "no"}, CurrentPrice: ${live.currentPrice ? "yes" : "no"})`);
           }
 
           // ── Normalize ────────────────────────────────────────────────────
@@ -175,24 +145,26 @@ async function main() {
             name: live.name || canonical.displayName,
             currentPrice: live.currentPrice,
             originalPrice: live.originalPrice ?? undefined,
-            isOnOffer: live.isOnOffer,
             isOutOfStock: false,
             imageUrl: live.imageUrl,
             scrapedAt: live.scrapedAt,
           });
 
-          // ── Load existing + update ────────────────────────────────────────
+          // ── Load existing snapshot from Convex + update ───────────────────
           const existing = await getSnapshot(canonical.productKey, supermarket);
           const { snapshot, historyEntry, wasNew } = updatePriceSnapshot(
             canonical, scraped, existing,
           );
 
+          // Push to Convex
           await upsertSnapshot(snapshot);
+          localSnapshots.push(snapshot);
 
-          if (historyEntry) {
-            await appendHistory(historyEntry);
-            wasNew ? stats.newSnapshots++ : stats.priceChanges++;
-          }
+        //   if (historyEntry) {
+        //     await appendHistory(historyEntry);
+        //     localHistory.push(historyEntry);
+        //     wasNew ? stats.newSnapshots++ : stats.priceChanges++;
+        //   }
 
           stats.success++;
         } catch (err) {
@@ -210,7 +182,7 @@ async function main() {
   }
 
   printSummary(stats);
-  await saveOutput();
+  await saveOutput(localSnapshots, localHistory);
 }
 
 // ── Summary ────────────────────────────────────────────────────────────────────
@@ -229,12 +201,14 @@ function printSummary(stats: Record<string, number>) {
 }
 
 // ── Save ───────────────────────────────────────────────────────────────────────
-async function saveOutput() {
+async function saveOutput(
+  snapshots: PriceSnapshot[],
+  history: PriceHistoryEntry[],
+): Promise<void> {
   const outputDir = path.resolve(process.cwd(), "output");
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const { snapshots, history } = dumpStore();
 
   const snapshotsPath = path.join(outputDir, `price-snapshots-${timestamp}.json`);
   const historyPath   = path.join(outputDir, `price-history-${timestamp}.json`);
@@ -244,6 +218,7 @@ async function saveOutput() {
 
   logger.info(`\nSnapshots → ${snapshotsPath} (${snapshots.length} records)`);
   logger.info(`History   → ${historyPath}   (${history.length} entries)`);
+  logger.info("(Data already pushed to Convex during run)");
 }
 
 // ── Run ────────────────────────────────────────────────────────────────────────
