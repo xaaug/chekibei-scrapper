@@ -12,9 +12,10 @@
 
 const BRAND_SYNONYMS: string[][] = [
   ["Blue Band", "Blueband", "Blue-Band"],
+  ["Nature's Own", "Natures Own", "Nature'sOwn", "NaturesOwn", "Nature's-Own", "Natures-Own"],
   ["Santa Maria", "Santamaria", "Santa-Maria"],
   ["Santa Lucia", "Santalucia", "Santa-Lucia"],
-  ["Parle G", "Parle-G", "ParleG"],
+  ["Parle G", "Parle-G", "ParleG", "Parle Glucose", "Parle-Glucose"],
   ["Baraka Chai", "Baraka-Chai", "BarakaChai"],
   ["Tap & Go", "Tap and Go", "Tap&Go"],
   ["Naivas Local", "Naivas"],

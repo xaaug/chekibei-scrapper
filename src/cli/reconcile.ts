@@ -119,7 +119,7 @@ async function main() {
       updatedProducts.push(updated);
 
       logger.info(
-        `${hadMatches ? "✓" : "✗"} ${result.matches.map((m) => `${m.supermarket}(${m.score.combined.toFixed(2)})`).join(", ") || "no matches"}`
+        `${hadMatches ? "✓" : "✗"} ${result.matches.map((m) => `${m.supermarket}(${m.score.toFixed(2)})`).join(", ") || "no matches"}`
       );
     }
   } finally {
