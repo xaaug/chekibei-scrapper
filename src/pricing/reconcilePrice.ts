@@ -54,7 +54,6 @@ function buildDiscount(
 
 function inferDiscountType(current: number, reference: number): DiscountType {
   const pct = ((reference - current) / reference) * 100;
-  if (pct >= 30) return "clearance";
-  if (pct >= 5)  return "promotion";
+  if (pct)  return "promotion";
   return "unknown";
 }
