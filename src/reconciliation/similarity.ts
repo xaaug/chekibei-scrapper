@@ -1,32 +1,139 @@
 /**
- * similarity.ts
+ * Structured similarity scoring for product reconciliation.
  *
- * Scoring primitives for two-phase reconciliation matching:
- *
- *   Phase 1 — brandScore(canonical.brand, candidate.name)
- *   Phase 2 — productNameScore(canonical.productName, candidate.name)
- *
- * Final score = BRAND_WEIGHT * brandScore + NAME_WEIGHT * productNameScore
- *
- * Brand is the stronger signal so it carries more weight. Neither phase
- * is a hard reject — a brand mismatch just pulls the combined score down.
+ * Scores brand, core product name, and size independently.
+ * A size mismatch is a hard disqualifier — "250G" and "5KG" are different products.
  */
 
-// ─── Weights ──────────────────────────────────────────────────────────────────
+export interface SimilarityBreakdown {
+  score: number;
+  brandMatch: boolean;
+  nameScore: number;
+  sizeMatch: boolean | null;
+  disqualified: boolean;
+  disqualifyReason?: string;
+}
 
-export const BRAND_WEIGHT = 0.6;
-export const NAME_WEIGHT = 0.4;
+// ─── Brand synonyms ───────────────────────────────────────────────────────────
+//
+// First item is canonical — all aliases resolve to it.
+// Sorted longest-first so "Blue Band" matches before "Blue".
 
-// ─── 1. Unit normalisation ────────────────────────────────────────────────────
+const BRAND_SYNONYMS: string[][] = [
+  ["Blue Band", "Blueband", "Blue-Band"],
+  ["Santa Maria", "Santamaria", "Santa-Maria"],
+  ["Santa Lucia", "Santalucia", "Santa-Lucia"],
+  ["Parle G", "Parle-G", "ParleG", "Parle Glucose", "Parle-Glucose"],
+  ["Baraka Chai", "Baraka-Chai", "BarakaChai"],
+  ["Tap & Go", "Tap and Go", "Tap&Go"],
+  ["Naivas Local", "Naivas"],
+  ["Quick Choice", "QuickChoice"],
+  ["Mill Bakers", "Millbakers"],
+  ["Majid Al Futtaim"],
+  // Misspellings
+  ["Brookside", "Brook Side"],
+  ["Kenchic", "Kenchick"],
+];
 
-/**
- * Collapse quantity+unit pairs to a canonical form so mismatched casing
- * or unit abbreviations don't penalise otherwise identical products.
- *
- *   "2KG" → "2kg"   |  "2000g"  → "2kg"
- *   "1l"  → "1000ml"|  "500ML"  → "500ml"
- *   "250gm" → "250g"
- */
+const BRAND_ALIAS_MAP = new Map<string, string>();
+for (const group of BRAND_SYNONYMS) {
+  const canonical = group[0];
+  for (const alias of group) {
+    BRAND_ALIAS_MAP.set(alias.toLowerCase(), canonical);
+  }
+}
+
+const SORTED_BRAND_STRINGS = [...BRAND_ALIAS_MAP.keys()].sort(
+  (a, b) => b.length - a.length,
+);
+
+function extractBrand(name: string): string {
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+
+  for (const alias of SORTED_BRAND_STRINGS) {
+    if (lower.startsWith(alias)) {
+      // Return canonical lowercased for internal comparison
+      return BRAND_ALIAS_MAP.get(alias)!.toLowerCase();
+    }
+  }
+
+  // Fallback: first token
+  return trimmed.split(/\s+/)[0]?.toLowerCase() ?? "";
+}
+
+/** Same logic as extractBrand but returns canonical casing — used externally */
+export function parseBrand(rawName: string): string | undefined {
+  const trimmed = rawName.trim();
+  if (!trimmed) return undefined;
+
+  const lower = trimmed.toLowerCase();
+  for (const alias of SORTED_BRAND_STRINGS) {
+    if (lower.startsWith(alias)) {
+      return BRAND_ALIAS_MAP.get(alias);
+    }
+  }
+
+  const first = trimmed.split(/\s+/)[0];
+  return first?.length > 0 ? first : undefined;
+}
+
+// ─── Synonym groups ───────────────────────────────────────────────────────────
+
+const SYNONYM_GROUPS: readonly string[][] = [
+  ["flour", "meal", "unga"],
+  ["maize flour", "maize meal"],
+  ["yoghurt", "yogurt", "yoghourt"],
+  ["milk", "maziwa"],
+  ["bread", "mkate"],
+  ["wheat", "ngano", "homebaking", "home baking", "chapati flour", "all purpose flour"],
+  ["extra virgin", "e/virgin"],
+  ["spirali", "spirals"],
+  ["olive oil", "oliveoil"],
+  ["instant coffee", "instantcoffee", "instantcoffe", "instantcofee", "coffee instant", "coffeinstant "],
+  ["coffe", "coffee", "cofee"],
+  ["chicken", "kuku"],
+  ["Astors", "Astro"],
+  ["Tea Bag", "t/bag", "Tea Bags", "t/bags", "teabag", "teabags"],
+  ["beef", "nyama"],
+  ["fish", "samaki"],
+  ["sachet", "packet", "pack", "pouch"],
+  ["bottle", "btl"],
+  ["tin", "can", "canned"],
+  ["bar", "block", "slab"],
+  ["original", "orig"],
+  ["natural", "nat"],
+  ["fortified", "fort"],
+  ["large", "big", "jumbo", "xl"],
+  ["small", "mini", "sm"],
+  ["medium", "med"],
+  ["family", "bulk", "value"],
+];
+
+const SYNONYM_MAP = new Map<string, string>();
+for (const group of SYNONYM_GROUPS) {
+  const canonical = group[0];
+  for (const word of group) SYNONYM_MAP.set(word.toLowerCase(), canonical);
+}
+
+const MULTI_WORD_SYNONYMS = [...SYNONYM_MAP.keys()]
+  .filter((k) => k.includes(" "))
+  .sort((a, b) => b.length - a.length);
+
+function applySynonymsToText(text: string): string {
+  let s = text;
+  for (const phrase of MULTI_WORD_SYNONYMS) {
+    if (s.includes(phrase)) s = s.replaceAll(phrase, SYNONYM_MAP.get(phrase)!);
+  }
+  return s;
+}
+
+function applySynonymToToken(token: string): string {
+  return SYNONYM_MAP.get(token) ?? token;
+}
+
+// ─── Unit normalisation ───────────────────────────────────────────────────────
+
 function normaliseUnit(token: string): string {
   const m = token.match(
     /^(\d+(?:\.\d+)?)\s*(kg|g|gm|gms|gram|grams|l|ltr|litre|litres|liter|liters|ml|millilitre|milliliter)s?$/i,
@@ -46,155 +153,178 @@ function normaliseUnit(token: string): string {
   return token;
 }
 
-// ─── 2. Synonym groups ────────────────────────────────────────────────────────
-
-/**
- * Words in the same group are collapsed to the first member before scoring,
- * so "maize meal" and "maize flour" share the token "flour" after expansion.
- *
- * Add entries here as you encounter new mismatches in Kenyan supermarket data.
- */
-const SYNONYM_GROUPS: readonly string[][] = [
-  ["flour", "meal", "unga"],
-  ["yoghurt", "yogurt", "yoghourt"],
-  ["milk", "maziwa"],
-  ["bread", "mkate"],
-  ["wheat", "ngano"],
-  ["chicken", "kuku"],
-  ["beef", "nyama"],
-  ["fish", "samaki"],
-  ["sachet", "packet", "pack", "pouch"],
-  ["bottle", "btl"],
-  ["tin", "can", "canned"],
-  ["bar", "block", "slab"],
-  ["original", "orig"],
-  ["natural", "nat"],
-  ["fortified", "fort"],
-  ["large", "big", "jumbo", "xl"],
-  ["small", "mini", "sm"],
-  ["medium", "med"],
-  ["family", "bulk", "value"],
-];
-
-const SYNONYM_MAP = new Map<string, string>();
-for (const group of SYNONYM_GROUPS) {
-  const canonical = group[0];
-  for (const word of group) SYNONYM_MAP.set(word, canonical);
-}
-
-function applySynonyms(token: string): string {
-  return SYNONYM_MAP.get(token) ?? token;
-}
-
-// ─── 3. Tokenisation ──────────────────────────────────────────────────────────
+// ─── Tokenisation ─────────────────────────────────────────────────────────────
 
 function tokenize(text: string): Set<string> {
+  const lower = text.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+  const synonymsApplied = applySynonymsToText(lower);
   return new Set(
-    text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s.]/g, " ")
+    synonymsApplied
       .split(/\s+/)
       .filter(Boolean)
       .map(normaliseUnit)
-      .map(applySynonyms),
+      .map(applySynonymToToken),
   );
 }
 
-// ─── 4. Jaccard on token sets ─────────────────────────────────────────────────
+// ─── Size extraction ──────────────────────────────────────────────────────────
+
+const SIZE_REGEX = /\b(\d+(?:\.\d+)?)\s*(g|kg|gm|gms|ml|l|mg|pack)\b/gi;
+
+interface ExtractedSize {
+  value: number;
+  unit: string;
+  normalized: string;
+}
+
+function extractSize(name: string): ExtractedSize | null {
+  SIZE_REGEX.lastIndex = 0;
+  const match = SIZE_REGEX.exec(name);
+  if (!match) return null;
+
+  const value = parseFloat(match[1]);
+  // Normalise unit: gm/gms → g so size comparison is consistent
+  const rawUnit = match[2].toLowerCase();
+  const unit = (rawUnit === "gm" || rawUnit === "gms" ? "g" : rawUnit).toUpperCase();
+
+  return {
+    value,
+    unit,
+    normalized: `${value % 1 === 0 ? Math.floor(value) : value}${unit}`,
+  };
+}
+
+function toBaseUnit(size: ExtractedSize): number {
+  switch (size.unit) {
+    case "KG":   return size.value * 1000;
+    case "G":    return size.value;
+    case "L":    return size.value * 1000;
+    case "ML":   return size.value;
+    case "MG":   return size.value / 1000;
+    case "PACK": return size.value;
+    default:     return size.value;
+  }
+}
+
+function sizesMatch(a: ExtractedSize, b: ExtractedSize): boolean {
+  const weightUnits = new Set(["G", "KG", "MG"]);
+  const volumeUnits = new Set(["ML", "L"]);
+
+  const aIsWeight = weightUnits.has(a.unit);
+  const bIsWeight = weightUnits.has(b.unit);
+  const aIsVolume = volumeUnits.has(a.unit);
+  const bIsVolume = volumeUnits.has(b.unit);
+
+  if ((aIsWeight && bIsVolume) || (aIsVolume && bIsWeight)) return false;
+  if (a.unit === "PACK" !== (b.unit === "PACK")) return false;
+
+  const aBase = toBaseUnit(a);
+  const bBase = toBaseUnit(b);
+  return Math.abs(aBase - bBase) / Math.max(aBase, bBase) < 0.01;
+}
+
+// ─── Core name stripping ──────────────────────────────────────────────────────
+
+function stripBrandAndSize(name: string): string {
+  let s = name.trim();
+  const lower = s.toLowerCase();
+
+  // Strip brand prefix (multi-word aware)
+  for (const alias of SORTED_BRAND_STRINGS) {
+    if (lower.startsWith(alias)) {
+      s = s.slice(alias.length).trim();
+      break;
+    }
+  }
+  // Fallback: strip first token if no known brand matched
+  if (s.toLowerCase() === name.trim().toLowerCase()) {
+    s = s.replace(/^\S+\s*/, "");
+  }
+
+  // Strip size tokens
+  SIZE_REGEX.lastIndex = 0;
+  s = s.replace(SIZE_REGEX, " ");
+
+  // Strip packaging words
+  s = s.replace(/\b(carton|packet|pack|jar|tin|bottle|sachet|tray)\b/gi, "");
+
+  // Apply synonyms so "meal" and "flour" share a token
+  const clean = s.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
+  return applySynonymsToText(clean).trim().replace(/\s+/g, " ");
+}
+
+// ─── Jaccard ──────────────────────────────────────────────────────────────────
 
 function jaccard(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 && b.size === 0) return 1;
-  if (a.size === 0 || b.size === 0) return 0;
-
-  const intersection = [...a].filter((t) => b.has(t));
-  const union = new Set([...a, ...b]);
-  return intersection.length / union.size;
+  const intersection = [...a].filter((t) => b.has(t)).length;
+  const union = new Set([...a, ...b]).size;
+  return union === 0 ? 0 : intersection / union;
 }
 
-// ─── 5. Brand scoring ─────────────────────────────────────────────────────────
+// ─── Main scoring ─────────────────────────────────────────────────────────────
 
-/**
- * Score how well `canonicalBrand` appears in `candidateRawName`.
- *
- * Strategy: tokenize the brand, then check what fraction of its tokens
- * appear in the candidate name. This handles:
- *   - "Famila" found inside "Famila Ujimix Sour 1Kg"          → 1.0
- *   - "Famila" found inside "FAMILA FOODS Ujimix Sour 1Kg"    → 1.0 (case normalised)
- *   - "Famila" not found in "Pembe Maize Flour 2Kg"           → 0.0
- *   - "Famila Foods" partially found in "Famila Ujimix 1Kg"   → 0.5 (1 of 2 brand tokens)
- *
- * Returns a value in [0, 1].
- * A score of 0 won't hard-reject — it just drags the combined score down.
- */
-export function brandScore(canonicalBrand: string, candidateRawName: string): number {
-  const brandTokens = tokenize(canonicalBrand);
-  const nameTokens = tokenize(candidateRawName);
+export function scoreSimilarity(
+  canonicalName: string,
+  candidateName: string,
+): SimilarityBreakdown {
+  const canonicalBrand = extractBrand(canonicalName);
+  const candidateBrand = extractBrand(candidateName);
+  const brandMatch = canonicalBrand === candidateBrand;
 
-  if (brandTokens.size === 0) return 0;
+  if (!brandMatch) {
+    return {
+      score: 0,
+      brandMatch: false,
+      nameScore: 0,
+      sizeMatch: null,
+      disqualified: true,
+      disqualifyReason: `brand mismatch: "${canonicalBrand}" vs "${candidateBrand}"`,
+    };
+  }
 
-  const matched = [...brandTokens].filter((t) => nameTokens.has(t));
-  return matched.length / brandTokens.size;
+  const canonicalSize = extractSize(canonicalName);
+  const candidateSize = extractSize(candidateName);
+  let sizeMatch: boolean | null = null;
+
+  if (canonicalSize && candidateSize) {
+    sizeMatch = sizesMatch(canonicalSize, candidateSize);
+    if (!sizeMatch) {
+      return {
+        score: 0,
+        brandMatch: true,
+        nameScore: 0,
+        sizeMatch: false,
+        disqualified: true,
+        disqualifyReason: `size mismatch: "${canonicalSize.normalized}" vs "${candidateSize.normalized}"`,
+      };
+    }
+  } else if (canonicalSize || candidateSize) {
+    sizeMatch = null;
+  }
+
+  const canonicalCore = stripBrandAndSize(canonicalName);
+  const candidateCore = stripBrandAndSize(candidateName);
+  const nameScore = jaccard(tokenize(canonicalCore), tokenize(candidateCore));
+
+  if (nameScore < 0.3) {
+    return {
+      score: 0,
+      brandMatch: true,
+      nameScore,
+      sizeMatch,
+      disqualified: true,
+      disqualifyReason: `core name too dissimilar: "${canonicalCore}" vs "${candidateCore}" (score: ${nameScore.toFixed(2)})`,
+    };
+  }
+
+  const sizeBonus = sizeMatch === true ? 0.3 : sizeMatch === null ? 0.15 : 0;
+  const score = Math.min(1, nameScore * 0.6 + sizeBonus + 0.1);
+
+  return { score, brandMatch: true, nameScore, sizeMatch, disqualified: false };
 }
 
-// ─── 6. Product name scoring ──────────────────────────────────────────────────
-
-/**
- * Score how similar `canonicalProductName` is to `candidateRawName`,
- * after stripping the brand tokens from both sides first.
- *
- * Why strip the brand? Because brand is already scored separately.
- * Leaving it in would double-count it and make brand matches look better
- * than they are at the product-name phase.
- *
- * "Ujimix Sour" vs "Ujimix Sour 1Kg"
- *   → high match (size token is in candidate but not canonical — small union penalty)
- *
- * "Ujimix Sour" vs "Ujimix Sweet 1Kg"
- *   → partial match ("ujimix" shared, "sour"/"sweet" differ)
- */
-export function productNameScore(
-  canonicalProductName: string,
-  canonicalBrand: string,
-  candidateRawName: string,
-): number {
-  const brandTokens = tokenize(canonicalBrand);
-
-  // Strip brand tokens from both sides before comparing
-  const strip = (tokens: Set<string>) =>
-    new Set([...tokens].filter((t) => !brandTokens.has(t)));
-
-  const nameTokens = strip(tokenize(canonicalProductName));
-  const candidateTokens = strip(tokenize(candidateRawName));
-
-  return jaccard(nameTokens, candidateTokens);
-}
-
-// ─── 7. Combined score (the one reconciliationEngine uses) ────────────────────
-
-export interface ScoreBreakdown {
-  /** Weighted final score in [0, 1] */
-  combined: number;
-  /** How well the brand appears in the candidate name */
-  brand: number;
-  /** Jaccard on product name tokens (brand-stripped) */
-  name: number;
-}
-
-/**
- * Full two-phase score for a canonical product against a raw candidate name.
- *
- * @param canonicalBrand       e.g. "Famila"
- * @param canonicalProductName e.g. "Ujimix Sour"
- * @param candidateRawName     e.g. "Famila Ujimix Sour 1Kg"
- */
-export function scoreCandidate(
-  canonicalBrand: string,
-  canonicalProductName: string,
-  candidateRawName: string,
-): ScoreBreakdown {
-  const brand = brandScore(canonicalBrand, candidateRawName);
-  const name = productNameScore(canonicalProductName, canonicalBrand, candidateRawName);
-  const combined = BRAND_WEIGHT * brand + NAME_WEIGHT * name;
-
-  return { combined, brand, name };
+/** Legacy single-number interface — used by reconciliationEngine */
+export function similarityScore(a: string, b: string): number {
+  return scoreSimilarity(a, b).score;
 }

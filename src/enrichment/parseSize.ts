@@ -14,7 +14,7 @@
  * Returns the raw match (for removal from name) and a normalized string.
  */
 
-const SIZE_UNITS = ["KG", "MG", "ML", "G", "L", "PACK"] as const;
+const SIZE_UNITS = ["KG", "MG", "ML", "G","GMS", "L", "PACK"] as const;
 export type SizeUnit = (typeof SIZE_UNITS)[number];
 
 // Build pattern dynamically from unit list (longest units first to avoid

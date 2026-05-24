@@ -13,7 +13,7 @@ export const QUICKMART_SELECTORS = {
   branchModalBody: ".modal-body.p-3.shop-layout-3",
   branchTitle: ".products-title",
   // branchContinueBtn: "button.btn.btn-brand.btn-block",
-  branchContinueBtn: "button[onclick=\"setContinue()\"]",
+  branchContinueBtn: ".modal-content button.btn.btn-brand",
  
   // ── Product cards ────────────────────────────────────────────────────────────
   productCard: ".products.productInfoJs",

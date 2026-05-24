@@ -7,9 +7,12 @@
     "build": "tsc",
     "discovery": "ts-node src/cli/discovery.ts",
     "reconcile": "ts-node src/cli/reconcile.ts",
-    "dev:discovery": "ts-node --watch src/cli/discovery.ts"
+    "dev:discovery": "ts-node --watch src/cli/discovery.ts",
+    "track-prices": "ts-node src/cli/trackPrices.ts"
   },
   "dependencies": {
+    "algoliasearch": "^5.52.1",
+    "dotenv": "^17.4.2",
     "playwright": "^1.44.0",
     "winston": "^3.13.0"
   },
