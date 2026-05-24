@@ -77,6 +77,7 @@ export function reconcileProduct(
       `Match: "${canonical.displayName}" → "${best.candidate.name}" ` +
         `(${sid}, score: ${best.score.toFixed(2)}, ` +
         `nameScore: ${best.breakdown.nameScore.toFixed(2)}, ` +
+        `brand: ${best.breakdown.brandConfidence}, ` +   
         `size: ${best.breakdown.sizeMatch ?? "n/a"})`,
     );
 
