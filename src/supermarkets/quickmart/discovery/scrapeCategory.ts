@@ -26,13 +26,12 @@ export async function scrapeCategory(
   page: Page,
   categoryUrl: string,
   maxPages: number,
+  category: string
 ): Promise<ScrapeCategoryResult> {
   const products: DiscoveredProduct[] = [];
   const pageErrors: DiscoveryPageError[] = [];
   const seen = new Set<string>();
   let pagesScraped = 0;
-
-  const category = deriveCategoryLabel(categoryUrl);
   const expectedPath = new URL(categoryUrl).pathname.replace(/\/$/, "");
 
   log.info(`Scraping category: ${category}`, { categoryUrl, maxPages });
@@ -147,18 +146,4 @@ export async function scrapeCategory(
   });
 
   return { products, pageErrors, pagesScraped };
-}
-
-function deriveCategoryLabel(url: string): string {
-  try {
-    const { pathname, searchParams } = new URL(url);
-    // Handle ?brand=golden-fry style URLs
-    const brandParam = searchParams.get("brand");
-    if (brandParam) return brandParam.replace(/-/g, " ");
-
-    const segments = pathname.split("/").filter(Boolean);
-    return segments[segments.length - 1]?.replace(/-/g, " ") ?? "unknown";
-  } catch {
-    return url;
-  }
 }

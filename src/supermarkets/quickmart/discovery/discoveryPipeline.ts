@@ -32,6 +32,7 @@ export async function runDiscoveryPipeline(
         page,
         input.categoryUrl,
         input.maxPages,
+        input.category
       );
 
       results.push({
