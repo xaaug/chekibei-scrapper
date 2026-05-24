@@ -19,6 +19,7 @@ import { CanonicalProduct } from "../types/canonical";
 import { buildCanonicalProducts } from "../enrichment";
 import { logger } from "../core/logger/logger";;
 import { algolia, ALGOLIA_INDEX } from "../lib/algolia";
+import { similarityEngine } from "../reconciliation/similarity";
 
 const CONVEX_HTTP_URL = process.env.CONVEX_HTTP_URL;
 
@@ -62,6 +63,9 @@ async function main() {
   logger.info("  Chekibei — Quickmart Discovery Scraper");
   logger.info("═══════════════════════════════════════════════");
   logger.info(`Convex URL: ${CONVEX_HTTP_URL ? CONVEX_HTTP_URL : "not set, skipping push"}`);
+
+  if (!CONVEX_HTTP_URL) throw new Error("CONVEX_HTTP_URL not set");
+  await similarityEngine.init(CONVEX_HTTP_URL);
 
   const categories: DiscoveryCategoryInput[] = customUrl
     ? [{ categoryUrl: customUrl, maxPages: customPages ? parseInt(customPages, 10) : 5 }]
