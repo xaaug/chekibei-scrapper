@@ -10,7 +10,7 @@
     "dev:discovery": "ts-node --watch src/cli/discovery.ts",
     "track-prices": "ts-node src/cli/trackPrices.ts",
     "seed:synonyms": "ts-node src/scripts/seedSynonyms.ts",
-    "seed:brands": "ts-node scripts/seedBrandCategories.ts"
+    "seed:brands": "ts-node src/scripts/seedBrandCategories.ts"
   },
   "dependencies": {
     "algoliasearch": "^5.52.1",

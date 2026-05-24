@@ -16,6 +16,7 @@ export interface DiscoveredProduct {
 export interface DiscoveryCategoryInput {
   categoryUrl: string;
   maxPages: number;
+  category: string
 }
 
 export interface DiscoveryRunResult {
