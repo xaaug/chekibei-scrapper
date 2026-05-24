@@ -54,7 +54,7 @@ export async function scrapeCategory(
 
   // ── Verify we landed on the right page ───────────────────────────────────
   // Wait for the URL to stabilise — their router may redirect after load
-  await page.waitForTimeout(30_500);
+  await page.waitForTimeout(3_500);
 
   const landedUrl = page.url();
   const landedPath = new URL(landedUrl).pathname.replace(/\/$/, "");
