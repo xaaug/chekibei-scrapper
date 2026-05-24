@@ -1,7 +1,7 @@
 import path from "path";
 
 export const QUICKMART_CONFIG = {
-  baseUrl: "https://quickmart.co.ke",
+  baseUrl: "https://www.quickmart.co.ke",
   source: "quickmart" as const,
 
   // Session
