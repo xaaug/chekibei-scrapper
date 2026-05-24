@@ -4,7 +4,7 @@ dotenv.config();
 const CONVEX_HTTP_URL = process.env.CONVEX_HTTP_URL;
 
 if (!CONVEX_HTTP_URL) {
-    
+
   console.error("CONVEX_HTTP_URL not set");
   process.exit(1);
 }
@@ -24,6 +24,7 @@ const BRAND_GROUPS: { officialName: string; synonyms: string[] }[] = [
   { officialName: "Majid Al Futtaim", synonyms: [] },
   { officialName: "Brookside",    synonyms: ["Brook Side"] },
   { officialName: "Kenchic",      synonyms: ["Kenchick"] },
+  { officialName: "Golden Fry",      synonyms: ["GoldenFry"] },
 ];
 
 const WORD_GROUPS: { officialName: string; synonyms: string[] }[] = [
