@@ -17,6 +17,7 @@ import { reconcileProduct } from "../reconciliation/reconciliationEngine";
 import { CanonicalProduct } from "../types/canonical";
 import { CandidateProduct, SupermarketId } from "../supermarkets/base/types";
 import { logger } from "../core/logger/logger";
+import { similarityEngine } from "../reconciliation/similarity";
 
 
 const CONVEX_HTTP_URL = process.env.CONVEX_HTTP_URL;
@@ -41,7 +42,6 @@ const SUPERMARKETS: SupermarketId[] = supersArg
 function resolveInputFile(): string {
   if (inputArg) return path.resolve(inputArg);
 
-  // Auto-pick the most recent canonical file in output/
   const outputDir = path.resolve(process.cwd(), "output");
   const files = fs
     .readdirSync(outputDir)
@@ -61,6 +61,9 @@ async function main() {
   logger.info("═══════════════════════════════════════════════");
   logger.info("  Chekibei — Reconciliation Engine");
   logger.info("═══════════════════════════════════════════════");
+
+  if (!CONVEX_HTTP_URL) throw new Error("CONVEX_HTTP_URL not set");
+  await similarityEngine.init(CONVEX_HTTP_URL);
 
   const inputFile = resolveInputFile();
   const canonicalProducts: CanonicalProduct[] = JSON.parse(
@@ -88,7 +91,7 @@ async function main() {
         try {
           const result = await scraper.scrape(page, {
             searchQuery: canonical.displayName,
-            maxScrolls: 5,          // shallow search — we just need top results
+            maxScrolls: 5,          
             waitTime: 5_500,
           });
 

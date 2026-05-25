@@ -8,7 +8,9 @@
     "discovery": "ts-node src/cli/discovery.ts",
     "reconcile": "ts-node src/cli/reconcile.ts",
     "dev:discovery": "ts-node --watch src/cli/discovery.ts",
-    "track-prices": "ts-node src/cli/trackPrices.ts"
+    "track-prices": "ts-node src/cli/trackPrices.ts",
+    "seed:synonyms": "ts-node src/scripts/seedSynonyms.ts",
+    "seed:brands": "ts-node src/scripts/seedBrandCategories.ts"
   },
   "dependencies": {
     "algoliasearch": "^5.52.1",

@@ -15,7 +15,7 @@ export interface ScrapeCategoryResult {
 }
 
 /**
- * Scrapes all pages of a single category URL up to `maxPages`.
+ * Scrapes all pages of a single category/brand URL up to `maxPages`.
  *
  * Resilience contract:
  * - Per-page failures are caught, logged, and recorded in `pageErrors`
@@ -26,29 +26,68 @@ export async function scrapeCategory(
   page: Page,
   categoryUrl: string,
   maxPages: number,
+  category: string
 ): Promise<ScrapeCategoryResult> {
   const products: DiscoveredProduct[] = [];
   const pageErrors: DiscoveryPageError[] = [];
   const seen = new Set<string>();
   let pagesScraped = 0;
-
-  // Derive category label from URL path
-  const category = deriveCategoryLabel(categoryUrl);
+  const expectedPath = new URL(categoryUrl).pathname.replace(/\/$/, "");
 
   log.info(`Scraping category: ${category}`, { categoryUrl, maxPages });
 
-  // ── Navigate to category page ────────────────────────────────────────────────
-  await page.goto(categoryUrl, {
+  // ── Navigate with referrer ────────────────────────────────────────────────
+  // Quickmart's frontend bounces cold brand/non-standard page navigations to
+  // /home. Navigating from the homepage first gives us a valid referrer and
+  // lets their JS initialise before we go to the target URL.
+  await page.goto(QUICKMART_CONFIG.baseUrl, {
     waitUntil: "domcontentloaded",
     timeout: QUICKMART_CONFIG.navigation.pageLoadTimeoutMs,
   });
 
-  // ── Page loop ────────────────────────────────────────────────────────────────
+  await page.goto(categoryUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: QUICKMART_CONFIG.navigation.pageLoadTimeoutMs,
+    referer: QUICKMART_CONFIG.baseUrl,
+  });
+
+  // ── Verify we landed on the right page ───────────────────────────────────
+  // Wait for the URL to stabilise — their router may redirect after load
+  await page.waitForTimeout(3_500);
+
+  const landedUrl = page.url();
+  const landedPath = new URL(landedUrl).pathname.replace(/\/$/, "");
+
+  if (landedPath !== expectedPath) {
+    const reason = `Navigation redirected — expected "${expectedPath}", landed on "${landedPath}". Page may require different URL structure or session state.`;
+    log.error(reason, { categoryUrl, landedUrl });
+    return {
+      products: [],
+      pageErrors: [{ page: 0, reason, retried: false }],
+      pagesScraped: 0,
+    };
+  }
+
+  // ── Wait for product grid to appear ──────────────────────────────────────
+  // domcontentloaded fires before their JS renders the product grid.
+  // Wait for at least one product card before proceeding.
+  try {
+    await page.waitForSelector(".products.productInfoJs", {
+      timeout: 10_000,
+      state: "attached",
+    });
+  } catch {
+    log.warn(`Product grid did not appear within 10s (category: ${category})`, {
+      landedUrl,
+    });
+    // Don't bail — extractProducts will log the empty result and return []
+  }
+
+  // ── Page loop ─────────────────────────────────────────────────────────────
   for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
     log.info(`Scraping page ${pageNum}/${maxPages}`);
 
     let pageProducts: DiscoveredProduct[] = [];
-    let retried = false;
 
     try {
       pageProducts = await withRetry(
@@ -60,7 +99,6 @@ export async function scrapeCategory(
       const reason = err instanceof Error ? err.message : String(err);
       log.error(`Page ${pageNum} extraction failed after retries`, { reason });
       pageErrors.push({ page: pageNum, reason, retried: true });
-      retried = true;
     }
 
     // Deduplicate and collect
@@ -73,9 +111,11 @@ export async function scrapeCategory(
     }
 
     pagesScraped++;
-    log.info(`Page ${pageNum}: ${pageProducts.length} products (${products.length} total unique)`);
+    log.info(
+      `Page ${pageNum}: ${pageProducts.length} products (${products.length} total unique)`,
+    );
 
-    // ── Check if there are more pages ────────────────────────────────────────
+    // ── Pagination ────────────────────────────────────────────────────────
     if (pageNum < maxPages) {
       let paginationResult;
 
@@ -84,7 +124,11 @@ export async function scrapeCategory(
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         log.error(`Pagination failed at page ${pageNum}`, { reason });
-        pageErrors.push({ page: pageNum, reason: `Pagination: ${reason}`, retried: false });
+        pageErrors.push({
+          page: pageNum,
+          reason: `Pagination: ${reason}`,
+          retried: false,
+        });
         break;
       }
 
@@ -102,14 +146,4 @@ export async function scrapeCategory(
   });
 
   return { products, pageErrors, pagesScraped };
-}
-
-function deriveCategoryLabel(url: string): string {
-  try {
-    const pathname = new URL(url).pathname;
-    const segments = pathname.split("/").filter(Boolean);
-    return segments[segments.length - 1]?.replace(/-/g, " ") ?? "unknown";
-  } catch {
-    return url;
-  }
 }

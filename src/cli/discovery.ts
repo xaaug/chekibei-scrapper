@@ -19,6 +19,7 @@ import { CanonicalProduct } from "../types/canonical";
 import { buildCanonicalProducts } from "../enrichment";
 import { logger } from "../core/logger/logger";;
 import { algolia, ALGOLIA_INDEX } from "../lib/algolia";
+import { similarityEngine } from "../reconciliation/similarity";
 
 const CONVEX_HTTP_URL = process.env.CONVEX_HTTP_URL;
 
@@ -34,27 +35,37 @@ function getArg(flag: string): string | undefined {
 const customUrl = getArg("--url");
 const customPages = getArg("--pages");
 
-// ── Default categories ─────────────────────────────────────────────────────────
-const DEFAULT_CATEGORIES: DiscoveryCategoryInput[] = [
-  
-  // { categoryUrl: "https://quickmart.co.ke/foods", maxPages: 1 },
-  { categoryUrl: "https://quickmart.co.ke/flour", maxPages: 10 },
-  { categoryUrl: "https://quickmart.co.ke/sugar", maxPages: 5 },
-  { categoryUrl: "https://quickmart.co.ke/rice-cereals", maxPages: 20 },
-  { categoryUrl: "https://quickmart.co.ke/cooking-oils-fats", maxPages: 20},
-  // { categoryUrl: "https://quickmart.co.ke/dairy-products", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/cakes-bread", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/breakfast", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/beverages", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/juices-carbonates", maxPages: 80 },
-  // { categoryUrl: "https://quickmart.co.ke/water", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/seasoning-condiments", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/pasta-noodles", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/diapers-wipes", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/oral-care-products", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/sanitary", maxPages: 50 },
-  // { categoryUrl: "https://quickmart.co.ke/personal-wash", maxPages: 50 },
-];
+async function fetchBrandCategories(): Promise<DiscoveryCategoryInput[]> {
+  const url = `${CONVEX_HTTP_URL}/brands/quickmart`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch brand categories (${res.status}): ${await res.text()}`);
+  }
+
+  const brands: Array<{ brandUrl: string; category: string; maxPages: number }> = await res.json();
+
+  if (brands.length === 0) {
+    throw new Error("No active brand categories found in Convex — seed first with npm run seed:brands");
+  }
+
+  logger.info(`Fetched ${brands.length} brand categories from Convex`);
+
+  return brands.map((b) => ({
+    categoryUrl: b.brandUrl,
+    category: b.category,
+    maxPages: b.maxPages,
+  }));
+}
+
+function deriveCategoryFromUrl(url: string): string {
+  try {
+    const segments = new URL(url).pathname.split("/").filter(Boolean);
+    return segments[segments.length - 1]?.replace(/-/g, " ") ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 async function main() {
@@ -63,13 +74,16 @@ async function main() {
   logger.info("═══════════════════════════════════════════════");
   logger.info(`Convex URL: ${CONVEX_HTTP_URL ? CONVEX_HTTP_URL : "not set, skipping push"}`);
 
-  const categories: DiscoveryCategoryInput[] = customUrl
-    ? [{ categoryUrl: customUrl, maxPages: customPages ? parseInt(customPages, 10) : 5 }]
-    : DEFAULT_CATEGORIES;
+  if (!CONVEX_HTTP_URL) throw new Error("CONVEX_HTTP_URL not set");
+  await similarityEngine.init(CONVEX_HTTP_URL);
 
-  logger.info(`Categories to scrape: ${categories.length}`, {
-    urls: categories.map((c) => c.categoryUrl),
-  });
+  const categories: DiscoveryCategoryInput[] = customUrl
+  ? [{
+      categoryUrl: customUrl,
+      category: getArg("--category") ?? deriveCategoryFromUrl(customUrl),
+      maxPages: customPages ? parseInt(customPages, 10) : 5,
+    }]
+  : await fetchBrandCategories();
   
   const session = loadSession();
 
