@@ -67,6 +67,7 @@ export function buildCanonicalProduct(raw: DiscoveredProduct): CanonicalProduct 
     category: raw.category,
     rawName,
     displayName,
+    imageUrl: raw.imageUrl,
     supermarkets,
     confidence,
     firstSeenAt: new Date().toISOString(),
@@ -94,6 +95,10 @@ export function buildCanonicalProducts(
         if (!existing.supermarkets[src]) {
           existing.supermarkets[src] = mapping;
         }
+      }
+      // Prefer non-null imageUrl from new canonical if existing doesn't have one
+      if (!existing.imageUrl && canonical.imageUrl) {
+        existing.imageUrl = canonical.imageUrl;
       }
     } else {
       byKey.set(canonical.productKey, canonical);

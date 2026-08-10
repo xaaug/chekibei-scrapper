@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chekibei — Kenyan Retail Intelligence & Scrapling Scraper</title>
+  
+  <!-- Apple Font Stack & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ==========================================================================
+       CHEKIBEI APPLE DESIGN SYSTEM (Human Interface Guidelines)
+       ========================================================================== */
+    :root {
+      --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+
+      /* Dark Theme Default */
+      --bg-primary: #000000;
+      --bg-secondary: #161618;
+      --bg-tertiary: #222226;
+      --bg-glass: rgba(22, 22, 24, 0.75);
+      --bg-glass-card: rgba(30, 30, 35, 0.75);
+
+      --text-primary: #f5f5f7;
+      --text-secondary: #86868b;
+      --text-tertiary: #a1a1a6;
+
+      --apple-border: rgba(255, 255, 255, 0.1);
+      --apple-border-strong: rgba(255, 255, 255, 0.2);
+
+      --accent-blue: #2997ff;
+      --accent-blue-hover: #3ca0ff;
+      --accent-green: #30d158;
+      --accent-orange: #ff9f0a;
+      --accent-red: #ff453a;
+
+      --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-pill: 9999px;
+      --blur-glass: blur(25px) saturate(190%);
+    }
+
+    .light {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e8e8ed;
+      --bg-glass: rgba(255, 255, 255, 0.75);
+      --bg-glass-card: rgba(255, 255, 255, 0.85);
+
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #6e6e73;
+
+      --apple-border: rgba(0, 0, 0, 0.08);
+      --apple-border-strong: rgba(0, 0, 0, 0.16);
+
+      --accent-blue: #0071e3;
+      --accent-blue-hover: #0077ed;
+      --accent-green: #34c759;
+      --accent-orange: #ff9500;
+      --accent-red: #ff3b30;
+
+      --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: var(--font-family);
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.47;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* Header */
+    .apple-header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--bg-glass);
+      backdrop-filter: var(--blur-glass); -webkit-backdrop-filter: var(--blur-glass);
+      border-bottom: 1px solid var(--apple-border);
+      padding: 12px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .brand-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 600; font-size: 1.1rem; letter-spacing: -0.02em;
+    }
+    .brand-icon {
+      width: 32px; height: 32px; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent-blue), #5856d6);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 700; font-size: 1.1rem;
+      box-shadow: 0 2px 8px rgba(0, 113, 227, 0.3);
+    }
+
+    /* Segmented Control */
+    .segmented-control {
+      display: inline-flex; background: var(--bg-tertiary);
+      padding: 3px; border-radius: var(--radius-sm);
+      border: 1px solid var(--apple-border);
+    }
+    .segment-btn {
+      padding: 6px 16px; font-size: 0.85rem; font-weight: 500;
+      border-radius: 7px; border: none; background: transparent;
+      color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+    }
+    .segment-btn.active {
+      background: var(--bg-secondary); color: var(--text-primary);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+
+    /* Layout */
+    .app-container {
+      display: flex; max-width: 1400px; margin: 0 auto;
+      padding: 24px; gap: 24px;
+    }
+    .sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
+    .main-content { flex: 1; display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+
+    /* Apple Cards */
+    .apple-card {
+      background: var(--bg-glass-card);
+      backdrop-filter: var(--blur-glass); -webkit-backdrop-filter: var(--blur-glass);
+      border: 1px solid var(--apple-border); border-radius: var(--radius-md);
+      padding: 20px; box-shadow: var(--card-shadow); transition: border-color 0.2s;
+    }
+    .apple-card:hover { border-color: var(--apple-border-strong); }
+
+    /* Store Options */
+    .store-option {
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--apple-border); background: var(--bg-secondary);
+      cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+      transition: all 0.2s; margin-bottom: 8px;
+    }
+    .store-option.selected {
+      border-color: var(--accent-blue); background: rgba(0, 113, 227, 0.08);
+    }
+    .store-badge { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .store-quickmart { background: #e53e3e; }
+    .store-naivas { background: #3182ce; }
+    .store-carrefour { background: #2b6cb0; }
+    .store-all { background: linear-gradient(135deg, #e53e3e, #3182ce, #2b6cb0); }
+
+    /* Form Controls */
+    .apple-input {
+      width: 100%; padding: 10px 14px; border-radius: var(--radius-sm);
+      border: 1px solid var(--apple-border); background: var(--bg-secondary);
+      color: var(--text-primary); font-family: var(--font-family); font-size: 0.9rem;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .apple-input:focus {
+      border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25);
+    }
+    .apple-button {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 18px; border-radius: var(--radius-sm); border: none;
+      font-weight: 500; font-size: 0.9rem; cursor: pointer; transition: all 0.2s;
+    }
+    .apple-button-primary {
+      background: var(--accent-blue); color: white;
+      box-shadow: 0 2px 10px rgba(0, 113, 227, 0.3);
+    }
+    .apple-button-primary:hover { background: var(--accent-blue-hover); transform: translateY(-1px); }
+
+    /* Category Pills */
+    .category-pill {
+      padding: 6px 12px; border-radius: var(--radius-pill);
+      border: 1px solid var(--apple-border); background: var(--bg-tertiary);
+      color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
+    }
+    .category-pill:hover { color: var(--text-primary); border-color: var(--apple-border-strong); }
+
+    /* Product Grid */
+    .product-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;
+    }
+    .product-card { display: flex; flex-direction: column; height: 100%; }
+    .product-img-container {
+      width: 100%; height: 150px; border-radius: var(--radius-sm);
+      background: var(--bg-secondary); display: flex; align-items: center; justify-content: center;
+      overflow: hidden; margin-bottom: 12px; position: relative;
+    }
+    .product-img-container img { max-width: 85%; max-height: 85%; object-fit: contain; }
+    .product-store-tag {
+      position: absolute; top: 8px; left: 8px; padding: 3px 7px;
+      border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: white;
+    }
+    .product-title {
+      font-size: 0.9rem; font-weight: 600; line-height: 1.3; margin-bottom: 8px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .product-price { font-size: 1.1rem; font-weight: 700; color: var(--accent-blue); margin-top: auto; }
+
+    /* Terminal Log Window */
+    .terminal-window {
+      background: #18181c; border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,255,255,0.1); overflow: hidden;
+      font-family: var(--font-mono); font-size: 0.8rem; color: #a9b7c6; margin-top: 12px;
+    }
+    .terminal-header {
+      background: #101013; padding: 8px 12px; display: flex; align-items: center; gap: 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-red { background: #ff5f56; } .dot-yellow { background: #ffbd2e; } .dot-green { background: #27c93f; }
+    .terminal-body { padding: 12px; max-height: 180px; overflow-y: auto; line-height: 1.6; }
+
+    /* Tab views */
+    .tab-view { display: none; }
+    .tab-view.active { display: flex; flex-direction: column; gap: 16px; }
+
+    @media (max-width: 768px) {
+      .app-container { flex-direction: column; padding: 16px; }
+      .sidebar { width: 100%; }
+      .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="apple-header">
+    <div class="brand-logo">
+      <div class="brand-icon">⚡</div>
+      <span>Chekibei <span style="opacity: 0.5; font-weight: 400">Scrapling Engine</span></span>
+    </div>
+
+    <nav class="segmented-control">
+      <button class="segment-btn active" onclick="switchTab('catalog')">Catalog</button>
+      <button class="segment-btn" onclick="switchTab('compare')">Price Matrix</button>
+      <button class="segment-btn" onclick="switchTab('scraper')">Live Scraper</button>
+      <button class="segment-btn" onclick="switchTab('jobs')">Jobs Log</button>
+    </nav>
+
+    <button className="segment-btn" class="apple-button" style="padding: 6px 12px; border: 1px solid var(--apple-border); background: transparent; color: var(--text-primary)" onclick="toggleTheme()">
+      🌗 Theme
+    </button>
+  </header>
+
+  <!-- Container -->
+  <div class="app-container">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="apple-card">
+        <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em">
+          Target Supermarkets
+        </h3>
+        
+        <div class="store-option selected" id="store-opt-all" onclick="selectStore('all')">
+          <div style="display:flex; align-items:center; gap:8px">
+            <span class="store-badge store-all"></span>
+            <span style="font-weight: 500; font-size: 0.9rem">All Supermarkets</span>
+          </div>
+          <span style="font-size: 0.8rem; opacity: 0.6" id="cnt-all">0</span>
+        </div>
+
+        <div class="store-option" id="store-opt-quickmart" onclick="selectStore('quickmart')">
+          <div style="display:flex; align-items:center; gap:8px">
+            <span class="store-badge store-quickmart"></span>
+            <span style="font-weight: 500; font-size: 0.9rem">Quickmart Kenya</span>
+          </div>
+          <span style="font-size: 0.8rem; opacity: 0.6" id="cnt-quickmart">0</span>
+        </div>
+
+        <div class="store-option" id="store-opt-naivas" onclick="selectStore('naivas')">
+          <div style="display:flex; align-items:center; gap:8px">
+            <span class="store-badge store-naivas"></span>
+            <span style="font-weight: 500; font-size: 0.9rem">Naivas Supermarket</span>
+          </div>
+          <span style="font-size: 0.8rem; opacity: 0.6" id="cnt-naivas">0</span>
+        </div>
+
+        <div class="store-option" id="store-opt-carrefour" onclick="selectStore('carrefour')">
+          <div style="display:flex; align-items:center; gap:8px">
+            <span class="store-badge store-carrefour"></span>
+            <span style="font-weight: 500; font-size: 0.9rem">Carrefour Kenya</span>
+          </div>
+          <span style="font-size: 0.8rem; opacity: 0.6" id="cnt-carrefour">0</span>
+        </div>
+      </div>
+
+      <div class="apple-card">
+        <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em">
+          Quick Auto Scrape
+        </h3>
+        <p style="font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 10px">
+          Trigger instant Scrapling crawl across Kenyan stores:
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <button class="category-pill" onclick="quickScrape('Milk')">⚡ Milk</button>
+          <button class="category-pill" onclick="quickScrape('Flour')">⚡ Flour</button>
+          <button class="category-pill" onclick="quickScrape('Rice')">⚡ Rice</button>
+          <button class="category-pill" onclick="quickScrape('Sugar')">⚡ Sugar</button>
+          <button class="category-pill" onclick="quickScrape('Cooking Oil')">⚡ Oil</button>
+          <button class="category-pill" onclick="quickScrape('Bread')">⚡ Bread</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- TAB 1: Product Catalog -->
+      <div id="tab-catalog" class="tab-view active">
+        <div class="apple-card" style="padding: 12px 18px; display: flex; gap: 12px; align-items: center; justify-content: space-between">
+          <input type="text" id="catalog-search-input" class="apple-input" placeholder="Search catalog items..." oninput="renderCatalog()" />
+          <select id="catalog-sort-select" class="apple-input" style="width: 180px" onchange="renderCatalog()">
+            <option value="default">Sort by Recent</option>
+            <option value="asc">Price: Low to High</option>
+            <option value="desc">Price: High to Low</option>
+          </select>
+          <button class="apple-button" style="border: 1px solid var(--apple-border); background: var(--bg-secondary); color: var(--text-primary)" onclick="loadProducts()">🔄 Refresh</button>
+        </div>
+
+        <div id="product-grid-container" class="product-grid">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- TAB 2: Price Comparison Matrix -->
+      <div id="tab-compare" class="tab-view">
+        <div class="apple-card" style="display: flex; gap: 12px; align-items: center">
+          <input type="text" id="compare-input" class="apple-input" placeholder="Compare prices across stores (e.g. Milk, Flour, Rice)..." value="milk" />
+          <button class="apple-button apple-button-primary" onclick="loadComparison()">Compare Prices</button>
+        </div>
+
+        <div id="compare-results-container" style="display: flex; flex-direction: column; gap: 12px">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- TAB 3: Live Scraper Controller -->
+      <div id="tab-scraper" class="tab-view">
+        <div class="apple-card" style="display: flex; flex-direction: column; gap: 16px">
+          <div>
+            <h2 style="font-size: 1.15rem; font-weight: 600">Scrapling Engine Controller</h2>
+            <p style="font-size: 0.85rem; color: var(--text-secondary)">
+              Execute automated, stealth scraping jobs directly from within the browser.
+            </p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: center">
+            <div>
+              <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 4px">Target Supermarket</label>
+              <select id="scraper-store-select" class="apple-input">
+                <option value="all">All Kenyan Supermarkets</option>
+                <option value="quickmart">Quickmart Kenya</option>
+                <option value="naivas">Naivas Supermarket</option>
+                <option value="carrefour">Carrefour Kenya</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 4px">Product Keyword</label>
+              <input type="text" id="scraper-query-input" class="apple-input" placeholder="e.g. Milk, Rice, Flour, Sugar" value="milk" />
+            </div>
+
+            <div style="align-self: flex-end">
+              <button id="btn-run-scraper" class="apple-button apple-button-primary" onclick="startLiveScrape()">⚡ Run Scrapling</button>
+            </div>
+          </div>
+
+          <!-- Real-time Terminal Log Console -->
+          <div class="terminal-window">
+            <div class="terminal-header">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+              <span style="margin-left: 8px; opacity: 0.7">Scrapling SSE Real-time Output Log</span>
+            </div>
+            <div id="terminal-body" class="terminal-body">
+              <div style="opacity: 0.4">System idle. Select store & keyword, then press 'Run Scrapling'.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Jobs Audit Log -->
+      <div id="tab-jobs" class="tab-view">
+        <div class="apple-card" style="display: flex; flex-direction: column; gap: 16px">
+          <div style="display: flex; justify-content: space-between; align-items: center">
+            <div>
+              <h2 style="font-size: 1.1rem; font-weight: 600">Scrape Execution Audit Log</h2>
+              <p style="font-size: 0.85rem; color: var(--text-secondary)">History of previous automated Scrapling jobs.</p>
+            </div>
+            <button class="apple-button" style="border: 1px solid var(--apple-border); background: var(--bg-secondary); color: var(--text-primary)" onclick="loadJobs()">🔄 Refresh</button>
+          </div>
+
+          <div style="overflow-x: auto">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--apple-border); text-align: left">
+                  <th style="padding: 8px; color: var(--text-secondary)">Job ID</th>
+                  <th style="padding: 8px; color: var(--text-secondary)">Store</th>
+                  <th style="padding: 8px; color: var(--text-secondary)">Query</th>
+                  <th style="padding: 8px; color: var(--text-secondary)">Status</th>
+                  <th style="padding: 8px; color: var(--text-secondary)">Items Found</th>
+                </tr>
+              </thead>
+              <tbody id="jobs-table-body">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Native JavaScript Application Logic -->
+  <script>
+    let products = [];
+    let currentStoreFilter = 'all';
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.segment-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-view').forEach(view => view.classList.remove('active'));
+
+      event.target.classList.add('active');
+      const targetView = document.getElementById(`tab-${tabId}`);
+      if (targetView) targetView.classList.add('active');
+
+      if (tabId === 'compare') loadComparison();
+      if (tabId === 'jobs') loadJobs();
+    }
+
+    function toggleTheme() {
+      document.documentElement.classList.toggle('light');
+      document.documentElement.classList.toggle('dark');
+    }
+
+    function selectStore(storeId) {
+      currentStoreFilter = storeId;
+      document.querySelectorAll('.store-option').forEach(opt => opt.classList.remove('selected'));
+      const selOpt = document.getElementById(`store-opt-${storeId}`);
+      if (selOpt) selOpt.classList.add('selected');
+      renderCatalog();
+    }
+
+    async function loadProducts() {
+      try {
+        const resp = await fetch('/api/products?limit=200');
+        const data = await resp.json();
+        products = data.products || [];
+
+        // Update counts
+        const counts = { all: products.length, quickmart: 0, naivas: 0, carrefour: 0 };
+        products.forEach(p => {
+          if (counts[p.supermarket] !== undefined) counts[p.supermarket]++;
+        });
+
+        document.getElementById('cnt-all').innerText = counts.all;
+        document.getElementById('cnt-quickmart').innerText = counts.quickmart;
+        document.getElementById('cnt-naivas').innerText = counts.naivas;
+        document.getElementById('cnt-carrefour').innerText = counts.carrefour;
+
+        renderCatalog();
+      } catch (err) {
+        console.error('Error loading products:', err);
+      }
+    }
+
+    function renderCatalog() {
+      const container = document.getElementById('product-grid-container');
+      const searchVal = document.getElementById('catalog-search-input').value.toLowerCase();
+      const sortVal = document.getElementById('catalog-sort-select').value;
+
+      let filtered = products.filter(p => {
+        if (currentStoreFilter !== 'all' && p.supermarket !== currentStoreFilter) return false;
+        if (searchVal && !p.name.toLowerCase().includes(searchVal)) return false;
+        return true;
+      });
+
+      if (sortVal === 'asc') filtered.sort((a,b) => (a.price || 9999) - (b.price || 9999));
+      if (sortVal === 'desc') filtered.sort((a,b) => (b.price || 0) - (a.price || 0));
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="apple-card" style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--text-secondary)">
+            <p style="font-size: 1.1rem; font-weight: 500; margin-bottom: 8px">No items found in catalog</p>
+            <p style="font-size: 0.85rem; opacity: 0.7">Trigger a live Scrapling crawl to populate store items.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(p => {
+        const storeClass = p.supermarket === 'quickmart' ? 'store-quickmart' : p.supermarket === 'naivas' ? 'store-naivas' : 'store-carrefour';
+        const img = p.image_url ? `<img src="${p.image_url}" alt="${p.name}" onerror="this.style.display='none'" />` : `<span style="font-size: 2rem; opacity: 0.3">🛒</span>`;
+        const priceDisplay = p.price ? `KES ${p.price.toLocaleString()}` : 'Price N/A';
+
+        return `
+          <div class="apple-card product-card">
+            <div class="product-img-container">
+              <span class="product-store-tag ${storeClass}">${p.supermarket}</span>
+              ${img}
+            </div>
+            <div class="product-title" title="${p.name}">${p.name}</div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: auto">
+              <div class="product-price">${priceDisplay}</div>
+              ${p.url ? `<a href="${p.url}" target="_blank" style="font-size: 0.8rem; color: var(--accent-blue); text-decoration: none">Store ↗</a>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function loadComparison() {
+      const query = document.getElementById('compare-input').value || 'milk';
+      const container = document.getElementById('compare-results-container');
+      container.innerHTML = `<div class="apple-card" style="padding: 20px; text-align: center; opacity: 0.6">Comparing prices across Kenyan supermarkets...</div>`;
+
+      try {
+        const resp = await fetch(`/api/compare?search=${encodeURIComponent(query)}`);
+        const data = await resp.json();
+        const list = data.comparisons || [];
+
+        if (list.length === 0) {
+          container.innerHTML = `<div class="apple-card" style="padding: 30px; text-align: center; opacity: 0.6">No products found for '${query}'. Try triggering a live Scrapling crawl!</div>`;
+          return;
+        }
+
+        container.innerHTML = list.map(c => `
+          <div class="apple-card" style="padding: 16px 20px">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
+              <h3 style="font-size: 1rem; font-weight: 600">${c.display_name}</h3>
+              ${c.cheapest_store ? `<span style="background: rgba(52, 199, 89, 0.15); color: var(--accent-green); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 600">🏆 Lowest at ${c.cheapest_store.toUpperCase()} (KES ${c.lowest_price})</span>` : ''}
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px">
+              ${['quickmart', 'naivas', 'carrefour'].map(storeKey => {
+                const item = c.stores[storeKey];
+                const isLowest = c.cheapest_store === storeKey;
+                return `
+                  <div style="background: ${isLowest ? 'rgba(0,113,227,0.05)' : 'var(--bg-secondary)'}; border: ${isLowest ? '1px solid var(--accent-blue)' : '1px solid var(--apple-border)'}; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 4px">
+                    <span style="font-size: 0.75rem; font-weight: 600; opacity: 0.6; text-transform: uppercase">${storeKey}</span>
+                    ${item ? `
+                      <span style="font-weight: 700; font-size: 1rem; color: ${isLowest ? 'var(--accent-blue)' : 'var(--text-primary)'}">KES ${item.price ? item.price.toLocaleString() : 'N/A'}</span>
+                      <span style="font-size: 0.75rem; color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap">${item.name}</span>
+                    ` : `<span style="font-size: 0.8rem; opacity: 0.4; font-style: italic">Not Available</span>`}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        container.innerHTML = `<div class="apple-card" style="padding: 20px; color: var(--accent-red)">Error loading comparison data.</div>`;
+      }
+    }
+
+    async function startLiveScrape() {
+      const store = document.getElementById('scraper-store-select').value;
+      const query = document.getElementById('scraper-query-input').value;
+      const btn = document.getElementById('btn-run-scraper');
+      const terminal = document.getElementById('terminal-body');
+
+      if (!query.trim()) return;
+
+      btn.disabled = true;
+      btn.innerText = 'Scraping...';
+      terminal.innerHTML = `<div class="log-entry">[System] Launching Scrapling extraction for ${store.toUpperCase()} ('${query}')...</div>`;
+
+      try {
+        const resp = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ supermarket: store, query: query, max_pages: 1 })
+        });
+        const data = await resp.json();
+
+        // SSE Log Stream
+        const eventSource = new EventSource(`/api/scrape/stream/${data.job_id}`);
+        eventSource.onmessage = (e) => {
+          const payload = JSON.parse(e.data);
+          if (payload.log) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            if (payload.log.includes('Completed')) entry.style.color = 'var(--accent-green)';
+            if (payload.log.includes('ERROR')) entry.style.color = 'var(--accent-red)';
+            entry.innerText = payload.log;
+            terminal.appendChild(entry);
+            terminal.scrollTop = terminal.scrollHeight;
+          }
+          if (payload.done) {
+            eventSource.close();
+            btn.disabled = false;
+            btn.innerText = '⚡ Run Scrapling';
+            loadProducts();
+          }
+        };
+        eventSource.onerror = () => {
+          eventSource.close();
+          btn.disabled = false;
+          btn.innerText = '⚡ Run Scrapling';
+        };
+      } catch (err) {
+        terminal.innerHTML += `<div class="log-entry" style="color: var(--accent-red)">[ERROR] Failed to start scrape: ${err.message}</div>`;
+        btn.disabled = false;
+        btn.innerText = '⚡ Run Scrapling';
+      }
+    }
+
+    function quickScrape(keyword) {
+      document.getElementById('scraper-query-input').value = keyword;
+      document.querySelectorAll('.segment-btn')[2].click(); // Switch to scraper tab
+      startLiveScrape();
+    }
+
+    async function loadJobs() {
+      const tbody = document.getElementById('jobs-table-body');
+      try {
+        const resp = await fetch('/api/jobs');
+        const data = await resp.json();
+        const jobs = data.jobs || [];
+
+        if (jobs.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; text-align: center; opacity: 0.5">No job history recorded yet.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = jobs.map(j => `
+          <tr style="border-bottom: 1px solid var(--apple-border)">
+            <td style="padding: 8px; font-family: var(--font-mono); font-weight: 500">${j.id}</td>
+            <td style="padding: 8px; text-transform: uppercase; font-weight: 600">${j.supermarket}</td>
+            <td style="padding: 8px">'${j.query}'</td>
+            <td style="padding: 8px">
+              <span style="padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; background: ${j.status==='completed'?'rgba(52,199,89,0.15)':j.status==='failed'?'rgba(255,59,48,0.15)':'rgba(255,149,0,0.15)'}; color: ${j.status==='completed'?'var(--accent-green)':j.status==='failed'?'var(--accent-red)':'var(--accent-orange)'}">
+                ${j.status}
+              </span>
+            </td>
+            <td style="padding: 8px; font-weight: 600">${j.items_found}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 20px; color: var(--accent-red)">Error loading jobs.</td></tr>`;
+      }
+    }
+
+    // Initialize on load
+    loadProducts();
+  </script>
+</body>
+</html>

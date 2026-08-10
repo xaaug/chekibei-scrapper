@@ -41,6 +41,8 @@ export interface CanonicalProduct {
 
   displayName: string; // brand + productName + size (UI-ready)
 
+  imageUrl?: string; // image URL from discovery (optional)
+
   confidence: ParserConfidence;
 
   supermarkets: Partial<Record<SupermarketSource, SupermarketMapping>>;

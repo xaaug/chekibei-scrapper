@@ -3,6 +3,7 @@ import { DiscoveredProduct } from "../../../types/discovery";
 import { QUICKMART_SELECTORS } from "../selectors";
 import { QUICKMART_CONFIG } from "../config";
 import { scopedLogger } from "../../../core/logger/logger";
+import { extractImage } from "../../../images/extractImage";
 
 const log = scopedLogger("quickmart:extractProductCard");
 
@@ -44,12 +45,24 @@ export async function extractProductCard(
       ? data.href
       : `${QUICKMART_CONFIG.baseUrl}${data.href.startsWith("/") ? "" : "/"}${data.href}`;
 
+    // Extract image URL from the card element
+    let imageUrl: string | undefined;
+    try {
+      // Get the outer HTML of the card to extract image
+      const cardHtml = await cardHandle.evaluate(el => (el as Element).outerHTML) as string;
+      const extracted = extractImage("quickmart", cardHtml);
+      imageUrl = extracted ?? undefined;
+    } catch (imgErr) {
+      log.debug("Failed to extract image from card", { error: imgErr });
+    }
+
     return {
       productId: data.productId || undefined,
       name: data.name,
       url,
       category,
       source: QUICKMART_CONFIG.source,
+      imageUrl,
     };
   } catch (err) {
     log.warn("Failed to extract product card", {

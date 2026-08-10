@@ -4,13 +4,14 @@
  */
 
 
-export type DiscoverySource = "quickmart";
+export type DiscoverySource = "quickmart" | "naivas" | "carrefour";
 export interface DiscoveredProduct {
   productId?: string;
   name: string;
   url: string;
   category: string;
   source: DiscoverySource;
+  imageUrl?: string;
 }
 
 export interface DiscoveryCategoryInput {
